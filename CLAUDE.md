@@ -42,20 +42,42 @@ Run the built binary with `./cli` or `./cli-dev`. Set `ANTHROPIC_API_KEY` in the
   - src/voice/: voice input
   - src/tasks/: background task management
 
+### KAIROS Subsystem (Active)
+
+Three experimental subsystems are fully enabled in `bun run build:dev:full`:
+
+- **KAIROS** (Persistent Assistant): Cross-session memory via `src/memdir/`, assistant state in `src/assistant/`. Activated by `setKairosActive(true)` in `src/main.tsx`.
+- **KAIROS_DREAM** (Background Autonomous Tasks): Claude works on tasks independently. Entry point `src/dream.ts`.
+- **PROACTIVE** (Proactive Issue Detection): Entry point `src/proactive/`. GrowthBook gates bypassed for non-ant builds.
+
 ## Build system
 
-- scripts/build.ts is the build script and feature-flag bundler. Feature flags are set via build arguments (e.g., `--feature=ULTRAPLAN`) or presets like `--feature-set=dev-full` (see README for details).
+- scripts/build.ts is the build script and feature-flag bundler. Feature flags are set via build arguments (e.g., `--feature=ULTRAPLAN`) or presets like `--feature-set=dev-full`.
 - Feature flags are resolved at compile time via `bun:bundle` — dead code elimination removes unused branches. See `src/utils/feature.ts` for the `feature()` function.
 - Build artifacts (`cli`, `cli-dev.*`, `*.bun-build`) are gitignored.
 
+## Special CLI entry points
+
+Handled early in `src/entrypoints/cli.tsx` before loading full CLI:
+
+- `./cli --version` / `-v` / `-V` (zero imports)
+- `./cli --dump-system-prompt` (outputs rendered system prompt)
+- `./cli --daemon-worker <kind>` (internal supervisor worker)
+- `./cli remote-control` / `rc` / `remote` / `sync` / `bridge` (IDE bridge)
+- `./cli daemon [subcommand]` (long-running supervisor)
+- `./cli ps` / `logs` / `attach` / `kill` / `--bg` / `--background` (session mgmt)
+- `./cli --update` / `--upgrade` (redirected to update subcommand)
+- `./cli --bare` (sets CLAUDE_CODE_SIMPLE=1 early)
+
 ## Important notes
 
-- **No test infrastructure**: This project has zero test files and zero test runners. Avoid changes that would benefit from tests (giant file splits, strict mode upgrades) unless you add testing infrastructure first.
-- **TypeScript strict mode**: Currently `strict: false` — enabling it produces ~7748 errors. Do not attempt to enable it in tsconfig.json without a phased migration plan.
+- **No test infrastructure**: This project has zero test files and zero test runners. Avoid changes that would benefit from tests unless you add testing infrastructure first.
+- **TypeScript strict mode**: Currently `strict: false` — enabling it produces ~7748 errors. Do not attempt without a phased migration plan.
 - **All source is TypeScript**: Zero `.js` files should remain in `src/`. If you find any, migrate them to `.ts`/`.tsx`.
 - **Dead commands**: Many command stubs have been removed from src/commands.ts. Do not re-add registrations unless the implementation exists.
-- **FEATURES.md**: Refer to this file for the complete audit of all 88 feature flags. All 34 previously broken flags have been restored.
-- **KAIROS / KAIROS_DREAM / PROACTIVE**: These three experimental subsystems are now fully enabled in `bun run build:dev:full`. GrowthBook remote gates are bypassed for non-ant builds, and `setKairosActive(true)` runs at startup.
+- **FEATURES.md**: Refer to this file for the complete audit of all 88 feature flags.
+- **Windows EPERM**: `cli-dev.exe` file locks during active processes cause build errors — this is a Windows file lock issue, not a compilation failure. 5632 modules bundle successfully.
+- **Package bin aliases**: `claude` and `claude-source` both point to `./cli` in package.json.
 
 ## Supported model providers
 
