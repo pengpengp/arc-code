@@ -173,6 +173,33 @@ export function dismissInsight(insightId) {
   }
 }
 
+/**
+ * Check if proactive mode is currently active
+ */
+export function isProactiveActive(): boolean {
+  if (!_proactiveState) _proactiveState = loadProactiveState()
+  return _proactiveState.enabled ?? false
+}
+
+/**
+ * Activate proactive mode
+ */
+export function activateProactive(source: string) {
+  if (!_proactiveState) _proactiveState = loadProactiveState()
+  _proactiveState.enabled = true
+  _proactiveState.activatedBy = source
+  saveProactiveState(_proactiveState)
+}
+
+/**
+ * Pause proactive mode temporarily
+ */
+export function pauseProactive() {
+  if (!_proactiveState) _proactiveState = loadProactiveState()
+  _proactiveState.enabled = false
+  saveProactiveState(_proactiveState)
+}
+
 // Default export for commands/proactive.js compatibility
 export default {
   name: 'proactive',

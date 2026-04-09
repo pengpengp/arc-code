@@ -9,6 +9,10 @@ import { isAssistantMode } from './index.js'
  * Check if KAIROS is enabled
  */
 export async function isKairosEnabled() {
+  // For arc-code builds, always enable KAIROS (no GrowthBook dependency)
+  if (process.env.USER_TYPE !== 'ant') {
+    return true
+  }
   // Check GrowthBook feature flag
   const kairosGate = getFeatureValue_CACHED_MAY_BE_STALE('tengu_kairos', false)
   return kairosGate || isAssistantMode()
@@ -26,6 +30,10 @@ export async function isBriefEnabled() {
  * Check if dream mode is enabled
  */
 export async function isDreamEnabled() {
+  // For arc-code builds, always enable dream mode
+  if (process.env.USER_TYPE !== 'ant') {
+    return true
+  }
   const dreamGate = getFeatureValue_CACHED_MAY_BE_STALE('tengu_kairos_dream', false)
   return dreamGate
 }
@@ -34,6 +42,10 @@ export async function isDreamEnabled() {
  * Check if proactive mode is enabled
  */
 export async function isProactiveEnabled() {
+  // For arc-code builds, always enable proactive mode
+  if (process.env.USER_TYPE !== 'ant') {
+    return true
+  }
   const proactiveGate = getFeatureValue_CACHED_MAY_BE_STALE('tengu_kairos_proactive', false)
   return proactiveGate
 }

@@ -2,4 +2,7 @@ node_modules/
 dist/
 cli
 cli-dev
+cli-dev.*
 openclaw/
+.omc/
+*.bun-build

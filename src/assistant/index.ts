@@ -3,7 +3,7 @@
  * Provides a daily-log style assistant that remembers conversations,
  * tracks tasks, and maintains context across sessions.
  *
- * This is a full implementation based on the free-code architecture.
+ * This is a full implementation based on the arc-code architecture.
  */
 import { join, resolve } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs'
@@ -25,6 +25,10 @@ let _assistantMemory = null
  * Check if assistant mode is active
  */
 export function isAssistantMode() {
+  // For arc-code builds, always enable assistant mode
+  if (process.env.USER_TYPE !== 'ant') {
+    return true
+  }
   return getFeatureValue_CACHED_MAY_BE_STALE('tengu_kairos', false) || _assistantForced
 }
 

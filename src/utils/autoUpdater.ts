@@ -72,6 +72,11 @@ export async function assertMinVersion(): Promise<void> {
     return
   }
 
+  // Skip version check for dev/custom builds
+  if (MACRO.VERSION.includes('dev') || process.env.CLAUDE_CODE_SKIP_UPDATE_CHECK) {
+    return
+  }
+
   try {
     const versionConfig = await getDynamicConfig_BLOCKS_ON_INIT<{
       minVersion: string

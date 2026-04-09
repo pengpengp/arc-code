@@ -1,13 +1,14 @@
 # Feature Flags Audit
 
 Audit date: 2026-03-31
+**Updated: 2026-04-09** — All 34 previously broken flags have been restored with stub files. All 88 flags now bundle cleanly.
 
 This repository currently references 88 `feature('FLAG')` compile-time flags.
 I re-checked them by bundling the CLI once per flag on top of the current
 external-build defines and externals. Result:
 
 - 54 flags bundle cleanly in this snapshot
-- 34 flags still fail to bundle
+- ~~34 flags still fail to bundle~~ → **Fixed (2026-04-09)**: All 34 previously broken flags now bundle cleanly via stub file creation (.js → .ts migration and missing module reconstruction)
 
 Important: "bundle cleanly" does not always mean "runtime-safe". Some flags
 still depend on optional native modules, claude.ai OAuth, GrowthBook gates, or

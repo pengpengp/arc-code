@@ -7,15 +7,16 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "types": ["bun"],
-    "baseUrl": ".",
     "paths": {
-      "src/*": ["src/*"]
+      "src/*": ["./src/*"]
     },
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "strict": false,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true
   },

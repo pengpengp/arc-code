@@ -1047,6 +1047,11 @@ async function run(): Promise<CommanderCommand> {
     // until the directory has been explicitly trusted.
     let kairosEnabled = false;
     let assistantTeamContext: Awaited<ReturnType<NonNullable<typeof assistantModule>['initializeAssistantTeam']>> | undefined;
+    // For arc-code builds (non-ant), activate KAIROS by default
+    if (feature('KAIROS') && process.env.USER_TYPE !== 'ant') {
+      setKairosActive(true);
+      kairosEnabled = true;
+    }
     if (feature('KAIROS') && (options as {
       assistant?: boolean;
     }).assistant && assistantModule) {
