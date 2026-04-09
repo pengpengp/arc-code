@@ -11,6 +11,7 @@ import {
   isSessionPersistenceDisabled,
 } from '../bootstrap/state.js'
 import instances from '../ink/instances.js'
+import { isStdinTTY, isStdoutTTY } from './isTTY.js'
 import {
   DISABLE_KITTY_KEYBOARD,
   DISABLE_MODIFY_OTHER_KEYS,
@@ -57,7 +58,7 @@ import { profileReport } from './startupProfiler.js'
  */
 /* eslint-disable custom-rules/no-sync-fs -- must be sync to flush before process.exit */
 function cleanupTerminalModes(): void {
-  if (!process.stdout.isTTY) {
+  if (!isStdoutTTY()) {
     return
   }
 
@@ -148,7 +149,7 @@ function printResumeHint(): void {
   }
   // Only show with TTY, interactive sessions, and persistence
   if (
-    process.stdout.isTTY &&
+    isStdoutTTY() &&
     getIsInteractive() &&
     !isSessionPersistenceDisabled()
   ) {
@@ -278,7 +279,7 @@ export const setupGracefulShutdown = memoize(() => {
     // Detect orphaned process when terminal closes without delivering SIGHUP.
     // macOS revokes TTY file descriptors instead of signaling, leaving the
     // process alive but unable to read/write. Periodically check stdin validity.
-    if (process.stdin.isTTY) {
+    if (isStdinTTY()) {
       orphanCheckInterval = setInterval(() => {
         // Skip during scroll drain — even a cheap check consumes an event
         // loop tick that scroll frames need. 30s interval → missing one is fine.

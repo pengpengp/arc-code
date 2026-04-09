@@ -7,6 +7,7 @@ import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
 import { findExecutable } from './findExecutable.js'
 import { getFsImplementation } from './fsOperations.js'
 import { which } from './which.js'
+import { isStdoutTTY } from './isTTY.js'
 
 type Platform = 'win32' | 'darwin' | 'linux'
 
@@ -228,7 +229,7 @@ function detectTerminal(): string | null {
   }
 
   // Detect non-interactive environment
-  if (!process.stdout.isTTY) return 'non-interactive'
+  if (!isStdoutTTY()) return 'non-interactive'
 
   return null
 }

@@ -10,6 +10,19 @@ const args = process.argv.slice(2)
 const compile = args.includes('--compile')
 const dev = args.includes('--dev')
 
+let customOutfile: string | null = null
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i]!
+  if (arg === '--outfile' && args[i + 1]) {
+    customOutfile = args[i + 1]
+    break
+  }
+  if (arg.startsWith('--outfile=')) {
+    customOutfile = arg.slice('--outfile='.length)
+    break
+  }
+}
+
 const fullExperimentalFeatures = [
   'AGENT_MEMORY_SNAPSHOT',
   'AGENT_TRIGGERS',
@@ -112,18 +125,18 @@ for (let i = 0; i < args.length; i += 1) {
 }
 const features = [...featureSet]
 
-const outfile = compile
+const outfile = customOutfile ?? (compile
   ? dev
     ? './dist/cli-dev'
     : './dist/cli'
   : dev
     ? './cli-dev'
-    : './cli'
+    : './cli')
 const buildTime = new Date().toISOString()
 const version = dev ? getDevVersion(pkg.version) : pkg.version
 
 const outDir = dirname(outfile)
-if (outDir !== '.') {
+if (outDir && outDir !== '.') {
   mkdirSync(outDir, { recursive: true })
 }
 
@@ -169,11 +182,11 @@ const cmd = [
   '--target',
   'bun',
   '--format',
-  'esm',
+  'cjs',
   '--outfile',
   outfile,
   '--minify',
-  // '--bytecode', // Disabled: incompatible with --format esm in Bun 1.3.x
+  '--bytecode',
   '--packages',
   'bundle',
   '--conditions',

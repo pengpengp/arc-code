@@ -1,7 +1,7 @@
-import { setCachedSystemTheme, themeFromOscColor } from './systemTheme.js'
+import { isStdinTTY, isStdoutTTY } from './isTTY.js'
 
 export function watchSystemTheme(internal_querier, setSystemTheme) {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) return () => {}
+  if (!isStdinTTY() || !isStdoutTTY()) return () => {}
   let cancelled = false
   let pollTimer = null
   let buffer = ''

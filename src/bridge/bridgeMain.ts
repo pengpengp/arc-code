@@ -18,6 +18,7 @@ import { isEnvTruthy, isInProtectedNamespace } from '../utils/envUtils.js'
 import { errorMessage } from '../utils/errors.js'
 import { truncateToWidth } from '../utils/format.js'
 import { logError } from '../utils/log.js'
+import { isStdinTTY } from '../utils/isTTY.js'
 import { sleep } from '../utils/sleep.js'
 import { createAgentWorktree, removeAgentWorktree } from '../utils/worktree.js'
 import {
@@ -2243,7 +2244,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
     worktreeAvailable &&
     parsedSpawnMode === undefined &&
     !resumeSessionId &&
-    process.stdin.isTTY
+    isStdinTTY()
   ) {
     const readline = await import('readline')
     const rl = readline.createInterface({
@@ -2641,7 +2642,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
       return
     }
   }
-  if (process.stdin.isTTY) {
+  if (isStdinTTY()) {
     process.stdin.setRawMode(true)
     process.stdin.resume()
     process.stdin.on('data', onStdinData)

@@ -4,6 +4,7 @@ import { logForDebugging } from '../../utils/debug.js';
 import { stopCapturingEarlyInput } from '../../utils/earlyInput.js';
 import { isEnvTruthy } from '../../utils/envUtils.js';
 import { isMouseClicksDisabled } from '../../utils/fullscreen.js';
+import { isStdinTTY, isStdoutTTY } from '../../utils/isTTY.js';
 import { logError } from '../../utils/log.js';
 import { EventEmitter } from '../events/emitter.js';
 import { InputEvent } from '../events/input-event.js';
@@ -149,7 +150,7 @@ export default class App extends PureComponent<Props, State> {
 
   // Determines if TTY is supported on the provided stdin
   isRawModeSupported(): boolean {
-    return this.props.stdin.isTTY;
+    return isStdinTTY();
   }
   override render() {
     return <TerminalSizeContext.Provider value={{
@@ -405,7 +406,7 @@ export default class App extends PureComponent<Props, State> {
     // wasn't enabled, so it's safe to emit unconditionally — without
     // it, SGR mouse sequences would appear as garbled text at the
     // shell prompt while suspended.
-    if (this.props.stdout.isTTY) {
+    if (isStdoutTTY()) {
       this.props.stdout.write(SHOW_CURSOR + DFE + DISABLE_MOUSE_TRACKING);
     }
 

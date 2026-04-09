@@ -22,6 +22,7 @@ import { logError } from 'src/utils/log.js'
 import { getAPIProviderForStatsig } from 'src/utils/model/providers.js'
 import type { PermissionMode } from 'src/utils/permissions/PermissionMode.js'
 import { jsonStringify } from 'src/utils/slowOperations.js'
+import { isStdoutTTY } from 'src/utils/isTTY.js'
 import { logOTelEvent } from 'src/utils/telemetry/events.js'
 import {
   endLLMRequestSpan,
@@ -505,7 +506,7 @@ function logAPISuccess({
     didFallBackToNonStreaming,
     isNonInteractiveSession,
     print: hasPrintFlag,
-    isTTY: process.stdout.isTTY ?? false,
+    isTTY: process.stdout.isTTY !== undefined ? process.stdout.isTTY : !!process.env.TERM,
     querySource:
       querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     ...(gateway

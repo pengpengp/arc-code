@@ -12,6 +12,7 @@
  */
 
 import { lastGrapheme } from './intl.js'
+import { isStdinTTY } from './isTTY.js'
 
 // Buffer for early input characters
 let earlyInputBuffer = ''
@@ -31,7 +32,7 @@ export function startCapturingEarlyInput(): void {
   // be in print mode. Raw mode disables ISIG (terminal Ctrl+C → SIGINT),
   // which would make -p uninterruptible.
   if (
-    !process.stdin.isTTY ||
+    !isStdinTTY() ||
     isCapturing ||
     process.argv.includes('-p') ||
     process.argv.includes('--print')

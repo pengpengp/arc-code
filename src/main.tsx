@@ -166,6 +166,7 @@ import { type ProcessedResume, processResumedConversation } from 'src/utils/sess
 import { parseSettingSourcesFlag } from 'src/utils/settings/constants.js';
 import { plural } from 'src/utils/stringUtils.js';
 import { type ChannelEntry, getInitialMainLoopModel, getIsNonInteractiveSession, getSdkBetas, getSessionId, getUserMsgOptIn, setAllowedChannels, setAllowedSettingSources, setChromeFlagOverride, setClientType, setCwdState, setDirectConnectServerUrl, setFlagSettingsPath, setInitialMainLoopModel, setInlinePlugins, setIsInteractive, setKairosActive, setOriginalCwd, setQuestionPreviewFormat, setSdkBetas, setSessionBypassPermissionsMode, setSessionPersistenceDisabled, setSessionSource, setUserMsgOptIn, switchSession } from './bootstrap/state.js';
+import { isStdinTTY, isStdoutTTY } from './utils/isTTY.js';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER') ? require('./utils/permissions/autoModeState.js') as typeof import('./utils/permissions/autoModeState.js') : null;
@@ -800,7 +801,13 @@ export async function main() {
   const hasPrintFlag = cliArgs.includes('-p') || cliArgs.includes('--print');
   const hasInitOnlyFlag = cliArgs.includes('--init-only');
   const hasSdkUrl = cliArgs.some(arg => arg.startsWith('--sdk-url'));
-  const isNonInteractive = hasPrintFlag || hasInitOnlyFlag || hasSdkUrl || !process.stdout.isTTY;
+  // On Windows MSYS/Cygwin (Git Bash), isTTY can be undefined even in
+  // interactive terminals. Treat undefined as interactive when TERM env var
+  // suggests a real terminal environment.
+  const isLikelyTerminal = process.stdout.isTTY !== undefined
+    ? process.stdout.isTTY
+    : !!process.env.TERM;
+  const isNonInteractive = hasPrintFlag || hasInitOnlyFlag || hasSdkUrl || !isLikelyTerminal;
 
   // Stop capturing early input for non-interactive modes
   if (isNonInteractive) {
@@ -855,7 +862,7 @@ export async function main() {
   profileCheckpoint('main_after_run');
 }
 async function getInputPrompt(prompt: string, inputFormat: 'text' | 'stream-json'): Promise<string | AsyncIterable<string>> {
-  if (!process.stdin.isTTY &&
+  if (!isStdinTTY() &&
   // Input hijacking breaks MCP.
   !process.argv.includes('mcp')) {
     if (inputFormat === 'stream-json') {
@@ -3220,7 +3227,7 @@ async function run(): Promise<CommanderCommand> {
           // In-place progress: \r + EL0 (erase to end of line). Final \n on
           // success so the next message lands on a fresh line. No-op when
           // stderr isn't a TTY (piped/redirected) — \r would just emit noise.
-          const isTTY = process.stderr.isTTY;
+          const isTTY = process.stderr.isTTY !== undefined ? process.stderr.isTTY : !!process.env.TERM;
           let hadProgress = false;
           sshSession = await createSSHSession({
             host: _pendingSSH.host,
@@ -4656,7 +4663,7 @@ function maybeActivateBrief(options: unknown): void {
   });
 }
 function resetCursor() {
-  const terminal = process.stderr.isTTY ? process.stderr : process.stdout.isTTY ? process.stdout : undefined;
+  const terminal = process.stderr.isTTY !== undefined ? process.stderr : process.stdout.isTTY !== undefined ? process.stdout : !!process.env.TERM ? process.stderr : undefined;
   terminal?.write(SHOW_CURSOR);
 }
 type TeammateOptions = {

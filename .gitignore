@@ -6,3 +6,4 @@ cli-dev.*
 openclaw/
 .omc/
 *.bun-build
+*.exe

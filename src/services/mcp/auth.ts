@@ -35,6 +35,7 @@ import { MCP_CLIENT_METADATA_URL } from '../../constants/oauth.js'
 import { openBrowser } from '../../utils/browser.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { errorMessage, getErrnoCode } from '../../utils/errors.js'
+import { isStdinTTY } from '../../utils/isTTY.js'
 import * as lockfile from '../../utils/lockfile.js'
 import { logMCPDebug } from '../../utils/log.js'
 import { getPlatform } from '../../utils/platform.js'
@@ -2365,7 +2366,7 @@ export async function readClientSecret(): Promise<string> {
     return envSecret
   }
 
-  if (!process.stdin.isTTY) {
+  if (!isStdinTTY()) {
     throw new Error(
       'No TTY available to prompt for client secret. Set MCP_CLIENT_SECRET env var instead.',
     )

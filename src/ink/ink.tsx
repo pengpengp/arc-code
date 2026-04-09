@@ -10,6 +10,7 @@ import { flushInteractionTime } from 'src/bootstrap/state.js';
 import { getYogaCounters } from 'src/native-ts/yoga-layout/index.js';
 import { logForDebugging } from 'src/utils/debug.js';
 import { logError } from 'src/utils/log.js';
+import { isStdinTTY, isStdoutTTY } from 'src/utils/isTTY.js';
 import { format } from 'util';
 import { colorize } from './colorize.js';
 import App from './components/App.js';
@@ -196,7 +197,7 @@ export default class Ink {
     this.frontFrame = emptyFrame(this.terminalRows, this.terminalColumns, this.stylePool, this.charPool, this.hyperlinkPool);
     this.backFrame = emptyFrame(this.terminalRows, this.terminalColumns, this.stylePool, this.charPool, this.hyperlinkPool);
     this.log = new LogUpdate({
-      isTTY: options.stdout.isTTY as boolean | undefined || false,
+      isTTY: options.stdout.isTTY !== undefined ? options.stdout.isTTY : !!process.env.TERM,
       stylePool: this.stylePool
     });
 
@@ -222,7 +223,7 @@ export default class Ink {
     this.unsubscribeExit = onExit(this.unmount, {
       alwaysLast: false
     });
-    if (options.stdout.isTTY) {
+    if (isStdoutTTY()) {
       options.stdout.on('resize', this.handleResize);
       process.on('SIGCONT', this.handleResume);
       this.unsubscribeTTYHandlers = () => {
@@ -278,7 +279,7 @@ export default class Ink {
     }
   }
   private handleResume = () => {
-    if (!this.options.stdout.isTTY) {
+    if (!isStdoutTTY()) {
       return;
     }
 
@@ -327,7 +328,7 @@ export default class Ink {
     // by handleResume (SIGCONT) and the sleep-wake detector; resize itself
     // doesn't exit alt-screen. Do NOT write ERASE_SCREEN: render() below
     // can take ~80ms; erasing first leaves the screen blank that whole time.
-    if (this.altScreenActive && !this.isPaused && this.options.stdout.isTTY) {
+    if (this.altScreenActive && !this.isPaused && isStdoutTTY()) {
       if (this.altScreenMouseTracking) {
         this.options.stdout.write(ENABLE_MOUSE_TRACKING);
       }
@@ -440,7 +441,7 @@ export default class Ink {
     const frame = this.renderer({
       frontFrame: this.frontFrame,
       backFrame: this.backFrame,
-      isTTY: this.options.stdout.isTTY,
+      isTTY: isStdoutTTY(),
       terminalWidth,
       terminalRows,
       altScreen: this.altScreenActive,
@@ -823,7 +824,7 @@ export default class Ink {
    * unchanged cells don't need repainting. Scrollback is preserved.
    */
   forceRedraw(): void {
-    if (!this.options.stdout.isTTY || this.isUnmounted || this.isPaused) return;
+    if (!isStdoutTTY() || this.isUnmounted || this.isPaused) return;
     this.options.stdout.write(ERASE_SCREEN + CURSOR_HOME);
     if (this.altScreenActive) {
       this.resetFramesForAltScreen();
@@ -894,7 +895,7 @@ export default class Ink {
    * handleResize.
    */
   reassertTerminalModes = (includeAltScreen = false): void => {
-    if (!this.options.stdout.isTTY) return;
+    if (!isStdoutTTY()) return;
     // Don't touch the terminal during an editor handoff — re-enabling kitty
     // keyboard here would undo enterAlternateScreen's disable and nano would
     // start seeing CSI-u sequences again.
@@ -944,7 +945,7 @@ export default class Ink {
       setRawMode?: (m: boolean) => void;
     };
     this.drainStdin();
-    if (stdin.isTTY && stdin.isRaw && stdin.setRawMode) {
+    if (isStdinTTY() && stdin.isRaw && stdin.setRawMode) {
       stdin.setRawMode(false);
     }
   }
@@ -1365,7 +1366,7 @@ export default class Ink {
   private wasRawMode = false;
   suspendStdin(): void {
     const stdin = this.options.stdin;
-    if (!stdin.isTTY) {
+    if (!isStdinTTY()) {
       return;
     }
 
@@ -1395,7 +1396,7 @@ export default class Ink {
   }
   resumeStdin(): void {
     const stdin = this.options.stdin;
-    if (!stdin.isTTY) {
+    if (!isStdinTTY()) {
       return;
     }
 
@@ -1477,7 +1478,7 @@ export default class Ink {
     // may not work correctly (e.g., in tmux, screen) and these are no-ops on
     // terminals that don't support them.
     /* eslint-disable custom-rules/no-sync-fs -- process exiting; async writes would be dropped */
-    if (this.options.stdout.isTTY) {
+    if (isStdoutTTY()) {
       if (this.altScreenActive) {
         // <AlternateScreen>'s unmount effect won't run during signal-exit.
         // Exit alt screen FIRST so other cleanup sequences go to the main screen.
@@ -1539,7 +1540,7 @@ export default class Ink {
     return this.exitPromise;
   }
   resetLineCount(): void {
-    if (this.options.stdout.isTTY) {
+    if (isStdoutTTY()) {
       // Swap so old front becomes back (for screen reuse), then reset front
       this.backFrame = this.frontFrame;
       this.frontFrame = emptyFrame(this.frontFrame.viewport.height, this.frontFrame.viewport.width, this.stylePool, this.charPool, this.hyperlinkPool);
@@ -1662,7 +1663,7 @@ export default class Ink {
  */
 /* eslint-disable custom-rules/no-sync-fs -- must be sync; called from signal handler / unmount */
 export function drainStdin(stdin: NodeJS.ReadStream = process.stdin): void {
-  if (!stdin.isTTY) return;
+  if (!isStdinTTY()) return;
   // Drain Node's stream buffer (bytes libuv already pulled in). read()
   // returns null when empty — never blocks.
   try {

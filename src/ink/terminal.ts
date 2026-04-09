@@ -1,5 +1,5 @@
 import { coerce } from 'semver'
-import type { Writable } from 'stream'
+import { isStdoutTTY } from '../utils/isTTY.js'
 import { env } from '../utils/env.js'
 import { gte } from '../utils/semver.js'
 import { getClearTerminalSequence } from './clearTerminal.js'
@@ -24,7 +24,7 @@ export type Progress = {
  */
 export function isProgressReportingAvailable(): boolean {
   // Only available if we have a TTY (not piped)
-  if (!process.stdout.isTTY) {
+  if (!isStdoutTTY()) {
     return false
   }
 
