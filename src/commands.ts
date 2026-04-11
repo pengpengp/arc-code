@@ -35,8 +35,6 @@ import session from './commands/session/index.js'
 import skills from './commands/skills/index.js'
 import status from './commands/status/index.js'
 import tasks from './commands/tasks/index.js'
-import share from './commands/share/index.js'
-import summary from './commands/summary/index.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const agentsPlatform =
   process.env.USER_TYPE === 'ant'
@@ -153,7 +151,6 @@ import {
 import memoize from 'lodash-es/memoize.js'
 import { isUsing3PServices, isClaudeAISubscriber } from './utils/auth.js'
 import { isFirstPartyAnthropicBaseUrl } from './utils/model/providers.js'
-import env from './commands/env/index.js'
 import exit from './commands/exit/index.js'
 import advisor from './commands/advisor.js'
 import exportCommand from './commands/export/index.js'
@@ -213,9 +210,6 @@ export const INTERNAL_ONLY_COMMANDS = [
   bridgeKick,
   version,
   ...(subscribePr ? [subscribePr] : []),
-  env,
-  share,
-  summary,
   agentsPlatform,
 ].filter(Boolean)
 
@@ -620,7 +614,6 @@ export const BRIDGE_SAFE_COMMANDS: Set<Command> = new Set(
     compact, // Shrink context — useful mid-session from a phone
     clear, // Wipe transcript
     cost, // Show session cost
-    summary, // Summarize conversation
     releaseNotes, // Show changelog
     files, // List tracked files
   ].filter((c): c is Command => c !== null),

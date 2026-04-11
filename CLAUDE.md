@@ -54,7 +54,20 @@ Three experimental subsystems are fully enabled in `bun run build:dev:full`:
 
 - scripts/build.ts is the build script and feature-flag bundler. Feature flags are set via build arguments (e.g., `--feature=ULTRAPLAN`) or presets like `--feature-set=dev-full`.
 - Feature flags are resolved at compile time via `bun:bundle` — dead code elimination removes unused branches. See `src/utils/feature.ts` for the `feature()` function.
-- Build artifacts (`cli`, `cli-dev.*`, `*.bun-build`) are gitignored.
+- **Windows bytecode builds**: Production builds use `--format cjs` + `--bytecode` (not ESM, which is incompatible with bytecode in Bun 1.3.x). On Windows this produces `cli.exe` / `arc-code.exe`.
+- Build artifacts (`cli`, `cli-dev.*`, `cli.exe`, `*.bun-build`, `release/`) are gitignored.
+
+## Packaging
+
+For distribution, the build artifact is copied to `release/arc-code.exe`:
+```bash
+bun run build           # produces ./cli.exe (Windows) or ./cli (Unix)
+cp cli.exe release/arc-code.exe
+```
+
+## Branding
+
+The project has been rebranded from "Free Code" to **Arc-Code**. All UI text, logos, and welcome messages now use "Arc-Code". The package.json name remains `claude-code-source-snapshot` for npm compatibility, but user-facing references should use "arc-code".
 
 ## Special CLI entry points
 
@@ -68,6 +81,15 @@ Handled early in `src/entrypoints/cli.tsx` before loading full CLI:
 - `./cli ps` / `logs` / `attach` / `kill` / `--bg` / `--background` (session mgmt)
 - `./cli --update` / `--upgrade` (redirected to update subcommand)
 - `./cli --bare` (sets CLAUDE_CODE_SIMPLE=1 early)
+- `./cli --assistant` (force KAIROS assistant mode — persistent cross-session memory, daily check-ins, brief UI)
+
+### KAIROS / Assistant Mode
+
+The `--assistant` flag (or auto-enabled for non-ant builds) activates:
+- **Persistent memory**: Conversations, tasks, and decisions saved to `~/.claude/assistant/`
+- **Session continuity**: Assistant remembers context across restarts
+- **Brief view**: Simplified single-line status bar UI
+- **Auto-backgrounding**: Long commands (>5s) moved to background to keep assistant responsive
 
 ## Important notes
 
@@ -76,7 +98,8 @@ Handled early in `src/entrypoints/cli.tsx` before loading full CLI:
 - **All source is TypeScript**: Zero `.js` files should remain in `src/`. If you find any, migrate them to `.ts`/`.tsx`.
 - **Dead commands**: Many command stubs have been removed from src/commands.ts. Do not re-add registrations unless the implementation exists.
 - **FEATURES.md**: Refer to this file for the complete audit of all 88 feature flags.
-- **Windows EPERM**: `cli-dev.exe` file locks during active processes cause build errors — this is a Windows file lock issue, not a compilation failure. 5632 modules bundle successfully.
+- **Windows EPERM**: `cli.exe` / `arc-code.exe` file locks during active processes cause build errors — this is a Windows file lock issue, not a compilation failure. Kill the process first before rebuilding.
+- **Cross-platform TTY detection**: `src/utils/isTTY.ts` provides `isStdoutTTY()` and `isStdinTTY()` with `TERM` env fallback for Git Bash/MSYS2 where `process.stdout.isTTY` is `undefined`. Always use these utilities instead of raw `isTTY` checks.
 - **Package bin aliases**: `claude` and `claude-source` both point to `./cli` in package.json.
 
 ## Supported model providers

@@ -143,11 +143,16 @@ export function saveSessions(sessions) {
   }
 }
 
+const MAX_MEMORY_ENTRIES = 10000
+
 /**
  * Add a memory entry
  */
 export function addMemoryEntry(entry) {
   if (!_assistantMemory) _assistantMemory = loadMemory()
+  if (_assistantMemory.entries.length >= MAX_MEMORY_ENTRIES) {
+    _assistantMemory.entries.shift() // Evict oldest entry
+  }
   _assistantMemory.entries.push({
     ...entry,
     timestamp: entry.timestamp || new Date().toISOString(),
