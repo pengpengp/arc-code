@@ -59,6 +59,34 @@ export function isDreamEnabled() {
 }
 
 /**
+ * Check if dream mode is currently active
+ */
+export function isDreamActive(): boolean {
+  return _dreamState?.enabled ?? false
+}
+
+/**
+ * Activate dream mode
+ */
+export function activateDream(source: string): void {
+  if (!_dreamState) setupDream()
+  _dreamState.enabled = true
+  _dreamState.activatedBy = source
+  saveDreamState(_dreamState)
+  logForDebugging(`Dream mode activated by: ${source}`)
+}
+
+/**
+ * Pause dream mode temporarily
+ */
+export function pauseDream(): void {
+  if (!_dreamState) return
+  _dreamState.enabled = false
+  saveDreamState(_dreamState)
+  logForDebugging('Dream mode paused')
+}
+
+/**
  * Load dream state
  */
 function loadDreamState() {

@@ -75,21 +75,36 @@ Cross-session memory that tracks conversations, decisions, and tasks. Ask about 
 
 ### Dream Mode — Background Autonomy
 
-Claude works on tasks independently in the background. Trigger via natural language or let the proactive system identify opportunities.
+Claude works on tasks independently in the background. Trigger via natural language, CLI flag, or let the proactive system identify opportunities.
 
 ```bash
-# Claude will work on identified tasks while you do other things
+./cli-dev --dream                        # Enable dream mode via CLI
+CLAUDE_CODE_DREAM=1 ./cli-dev            # Enable via environment variable
 ```
+
+Core capabilities:
+- **Task queue** — Tasks queued to `~/.claude/dream/queue.json`
+- **Subprocess execution** — Each task spawns an independent `cli-dev` process
+- **Timeout control** — Default 30 minutes, configurable via `maxDurationMinutes`
+- **Result consolidation** — Results saved to `~/.claude/dream/results.json`
+- **autoDream** — Automatic background consolidation triggered on query end (stopHooks)
 
 ### Proactive Assistance
 
-Claude detects and surfaces issues without prompting:
+Claude detects and surfaces issues without prompting.
 
-- Uncommitted changes提醒
-- Stale dependency detection
-- Build error identification
-- Code improvement suggestions
-- Test failure analysis
+```bash
+./cli-dev --proactive                    # Enable proactive mode via CLI
+CLAUDE_CODE_PROACTIVE=1 ./cli-dev        # Enable via environment variable
+```
+
+Claude detects and surfaces issues without prompting:
+- **Uncommitted changes** — Notifies about unstaged/uncommitted files
+- **Stale dependency detection** — Identifies outdated npm packages
+- **Build error identification** — Detects compilation failures
+- **Code improvement suggestions** — Proactively suggests optimizations
+- **Test failure analysis** — Identifies failing tests and root causes
+- **Context-aware** — Automatically pauses during `/clear` or builds, resumes after completion
 
 ### Multi-Agent Orchestration
 

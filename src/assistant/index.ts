@@ -197,6 +197,14 @@ export function getAssistantDir() {
 }
 
 /**
+ * Returns the activation path for telemetry purposes.
+ * Used by main.tsx to report where the assistant was activated from.
+ */
+export function getAssistantActivationPath(): string | undefined {
+  return ASSISTANT_DIR
+}
+
+/**
  * Check if assistant settings are valid
  */
 export function validateAssistantSettings() {

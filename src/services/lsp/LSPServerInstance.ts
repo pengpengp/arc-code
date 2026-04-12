@@ -43,6 +43,8 @@ export type LSPServerInstance = {
   readonly lastError: Error | undefined
   /** Number of times restart() has been called */
   readonly restartCount: number
+  /** PID of the underlying server process (for memory monitoring) */
+  readonly pid: number | undefined
   /** Start the server and initialize it */
   start(): Promise<void>
   /** Stop the server gracefully */
@@ -92,11 +94,6 @@ export function createLSPServerInstance(
   config: ScopedLspServerConfig,
 ): LSPServerInstance {
   // Validate that unimplemented fields are not set
-  if (config.restartOnCrash !== undefined) {
-    throw new Error(
-      `LSP server '${name}': restartOnCrash is not yet implemented. Remove this field from the configuration.`,
-    )
-  }
   if (config.shutdownTimeout !== undefined) {
     throw new Error(
       `LSP server '${name}': shutdownTimeout is not yet implemented. Remove this field from the configuration.`,
@@ -480,6 +477,9 @@ export function createLSPServerInstance(
     },
     get restartCount() {
       return restartCount
+    },
+    get pid() {
+      return client.pid
     },
     start,
     stop,

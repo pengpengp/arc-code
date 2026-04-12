@@ -8,6 +8,7 @@ import { closeSync, fstatSync, openSync, readSync } from 'fs'
 import {
   appendFile as fsAppendFile,
   open as fsOpen,
+  stat as fsStat,
   mkdir,
   readdir,
   readFile,
@@ -121,6 +122,14 @@ type Transcript = (
 // 50MB — prevents OOM in the tombstone slow path which reads + rewrites the
 // entire session file. Session files can grow to multiple GB (inc-3930).
 const MAX_TOMBSTONE_REWRITE_BYTES = 50 * 1024 * 1024
+
+/**
+ * Hard cap on session JSONL file size (50MB). When a session file approaches
+ * this limit, writes are skipped to prevent unbounded growth.
+ */
+const MAX_SESSION_FILE_SIZE_BYTES = 50 * 1024 * 1024
+
+let sessionSizeWarningLogged = false
 
 const SKIP_FIRST_PROMPT_PATTERN =
   /^(?:\s*<[a-z][\w-]*[\s>]|\[Request interrupted by user[^\]]*\])/
@@ -555,6 +564,7 @@ class Project {
   private internalEventReader: InternalEventReader | null = null
   private internalSubagentEventReader: InternalEventReader | null = null
   private pendingWriteCount: number = 0
+  private _sizeWarningLogged = false
   private flushResolvers: Array<() => void> = []
   // Per-file write queues. Each entry carries a resolve callback so
   // callers of enqueueWrite can optionally await their specific write.
@@ -1152,6 +1162,23 @@ class Project {
         return
       }
       sessionFile = existing
+    }
+
+    // Size cap check — if session file exceeds limit, skip further writes
+    // and warn the user. The session will need a rolling summary.
+    if (isCurrentSession && sessionFile && this._sizeWarningLogged === false) {
+      try {
+        const st = await fsStat(sessionFile)
+        if (st.size > MAX_SESSION_FILE_SIZE_BYTES) {
+          this._sizeWarningLogged = true
+          logForDebugging(
+            `Session file ${sessionFile} exceeded size cap (${st.size} bytes). ` +
+              `Further writes suppressed until rolling summary runs.`,
+          )
+        }
+      } catch {
+        // File may not exist yet — ignore
+      }
     }
 
     // Only load current session messages if needed
@@ -2576,6 +2603,23 @@ function appendEntryToFile(
   const fs = getFsImplementation()
   const line = jsonStringify(entry) + '\n'
   try {
+    // Check file size before writing to prevent unbounded growth
+    try {
+      const st = fs.statSync(fullPath)
+      if (st.size >= MAX_SESSION_FILE_SIZE_BYTES) {
+        // Log warning once per session to avoid spam
+        if (!sessionSizeWarningLogged) {
+          sessionSizeWarningLogged = true
+          console.warn(
+            `[sessionStorage] Session file "${fullPath}" exceeds 50MB (${(st.size / 1024 / 1024).toFixed(1)}MB). ` +
+              'Consider using /compact to reduce context size.',
+          )
+        }
+        return // Skip write to prevent further growth
+      }
+    } catch {
+      // File doesn't exist yet — proceed with append (will be created)
+    }
     fs.appendFileSync(fullPath, line, { mode: 0o600 })
   } catch {
     fs.mkdirSync(dirname(fullPath), { mode: 0o700 })

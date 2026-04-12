@@ -1023,7 +1023,7 @@ export function useManageMCPConnections(
     _pluginReconnectKey,
   ])
 
-  // Cleanup all timers on unmount
+  // Cleanup all timers and disconnect all MCP servers on unmount
   useEffect(() => {
     const timers = reconnectTimersRef.current
     return () => {
@@ -1037,8 +1037,18 @@ export function useManageMCPConnections(
         flushTimerRef.current = null
         flushPendingUpdates()
       }
+      // Disconnect all connected MCP servers to prevent orphaned child processes
+      // and stale reconnection attempts (fixes MCP leak pattern seen in Cline #3200)
+      const clients = store.getState().mcp.clients
+      for (const client of clients) {
+        if (client.type === 'connected') {
+          // clearServerCache calls client.cleanup() which terminates stdio child processes
+          // and cancels SSE/HTTP connections
+          void clearServerCache(client.name, client.config).catch(() => {})
+        }
+      }
     }
-  }, [flushPendingUpdates])
+  }, [flushPendingUpdates, store])
 
   // Expose reconnectMcpServer function for components to use.
   // Reads mcp.clients via store.getState() so this callback stays stable

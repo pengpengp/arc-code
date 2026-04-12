@@ -21,7 +21,7 @@ const WORKER_REGISTRY_FILE = join(DAEMON_DIR, 'workers.json')
 /**
  * Main daemon entry point
  */
-export async function daemonMain(args) {
+export async function daemonMain(args: string[]): Promise<void> {
   const command = args[0] || 'start'
 
   switch (command) {
@@ -44,7 +44,27 @@ export async function daemonMain(args) {
 /**
  * Start the daemon
  */
-async function startDaemon(args) {
+async function startDaemon(args: string[]): Promise<void> {
+  // Atomic PID file check-and-create to prevent race conditions
+  // If file exists but process is dead, clean up and proceed
+  if (existsSync(DAEMON_PID_FILE)) {
+    try {
+      const pid = parseInt(readFileSync(DAEMON_PID_FILE, 'utf-8').trim(), 10)
+      process.kill(pid, 0)
+      // Process is alive — daemon is running
+      console.log('Daemon is already running.')
+      return
+    } catch {
+      // Stale PID file — process is dead, clean up
+      logForDebugging(`[daemon] Stale PID file detected, cleaning up`)
+      try {
+        require('fs').unlinkSync(DAEMON_PID_FILE)
+      } catch {
+        // Ignore — may have been cleaned up by another process
+      }
+    }
+  }
+
   // Check if already running
   if (isDaemonRunning()) {
     console.log('Daemon is already running.')
@@ -186,7 +206,16 @@ function handleDaemonMessage(socket, message) {
 /**
  * Spawn a worker process
  */
-async function spawnWorker(type, config) {
+/**
+ * Spawn a worker process
+ */
+const MAX_RESTARTS_PER_WORKER = 5
+/**
+ * Delay before auto-restart to allow system resources to stabilize.
+ */
+const RESTART_DELAY_MS = 1000
+
+async function spawnWorker(type: string, config: Record<string, unknown> = {}): Promise<string> {
   const id = `worker_${randomUUID().slice(0, 8)}`
   const daemonPath = join(process.cwd(), process.argv[1])
 
@@ -196,12 +225,28 @@ async function spawnWorker(type, config) {
     env: { ...process.env, CLAUDE_WORKER_ID: id, CLAUDE_WORKER_TYPE: type },
   })
 
-  // Register worker
-  registerWorker(id, type, child.pid)
+  // Register worker with restart count tracking
+  registerWorker(id, type, child.pid, 0)
 
   child.on('exit', (code) => {
+    const workers = loadWorkers()
+    const worker = workers.find(w => w.id === id)
+    const restartCount = worker?.restartCount ?? 0
     unregisterWorker(id)
     logForDebugging(`Worker ${id} exited with code ${code}`)
+
+    // Auto-restart on unexpected exit (code !== 0 and code !== null)
+    // with max restart limit to prevent infinite loops
+    if (code !== 0 && code !== null && restartCount < MAX_RESTARTS_PER_WORKER) {
+      logForDebugging(`[daemon] Worker ${id} crashed (exit code ${code}), attempting auto-restart (${restartCount + 1}/${MAX_RESTARTS_PER_WORKER})`)
+      setTimeout(() => {
+        spawnWorker(type, config).catch(err => {
+          logForDebugging(`[daemon] Auto-restart failed for ${id}: ${err.message}`)
+        })
+      }, RESTART_DELAY_MS)
+    } else if (restartCount >= MAX_RESTARTS_PER_WORKER) {
+      logForDebugging(`[daemon] Worker ${id} exceeded max restarts (${MAX_RESTARTS_PER_WORKER}), not restarting`)
+    }
   })
 
   return id
@@ -229,10 +274,55 @@ async function listWorkers() {
 /**
  * Register a worker
  */
-function registerWorker(id, type, pid) {
+function registerWorker(id, type, pid, restartCount = 0) {
   const workers = loadWorkers()
-  workers.push({ id, type, pid, status: 'running', startedAt: new Date().toISOString() })
+  workers.push({ id, type, pid, status: 'running', startedAt: new Date().toISOString(), restartCount })
   saveWorkers(workers)
+
+  // Prune old stopped workers to prevent unbounded growth
+  pruneStoppedWorkers()
+}
+
+/**
+ * Prune stopped workers older than 7 days from workers.json.
+ * Also verifies that "running" workers are actually alive — marks dead
+ * ones as stopped so they get pruned and are eligible for restart.
+ */
+function pruneStoppedWorkers() {
+  const CUTOFF_DAYS = 7
+  const cutoffMs = Date.now() - CUTOFF_DAYS * 24 * 60 * 60 * 1000
+  const workers = loadWorkers()
+  let changed = false
+
+  const pruned = workers.filter(w => {
+    if (w.status === 'running') {
+      // Verify the process is actually still alive
+      if (w.pid) {
+        try {
+          process.kill(w.pid, 0)
+          return true // Still alive
+        } catch {
+          // Process is dead — mark as stopped
+          logForDebugging(`[daemon] Worker ${w.id} (PID ${w.pid}) is dead, marking as stopped`)
+          w.status = 'stopped'
+          w.stoppedAt = new Date().toISOString()
+          changed = true
+          // Keep it so the 7-day prune can clean it up
+          return true
+        }
+      }
+      return true
+    }
+    if (!w.stoppedAt) return false
+    return new Date(w.stoppedAt).getTime() > cutoffMs
+  })
+
+  if (pruned.length !== workers.length) {
+    saveWorkers(pruned)
+    logForDebugging(`[daemon] Pruned ${workers.length - pruned.length} stale worker entries`)
+  } else if (changed) {
+    saveWorkers(workers)
+  }
 }
 
 /**

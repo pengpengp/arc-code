@@ -283,6 +283,23 @@ let isWriting = false
 let currentFlushPromise: Promise<void> | null = null
 let cleanupRegistered = false
 let lastAddedEntry: LogEntry | null = null
+let purgeInterval: ReturnType<typeof setInterval> | null = null
+
+/**
+ * TTL for pending entries — if an entry sits in memory longer than this
+ * without being flushed (e.g., no user message arrives), it is evicted
+ * to prevent unbounded memory growth.
+ */
+const PENDING_ENTRIES_TTL_MS = 30 * 60 * 1000 // 30 minutes
+
+/**
+ * Remove entries that have been sitting in the pending buffer longer
+ * than the TTL. Called periodically during flush and at session end.
+ */
+export function purgeExpiredPendingEntries(): void {
+  const cutoff = Date.now() - PENDING_ENTRIES_TTL_MS
+  pendingEntries = pendingEntries.filter(entry => entry.timestamp >= cutoff)
+}
 // Timestamps of entries already flushed to disk that should be skipped when
 // reading. Used by removeLastFromHistory when the entry has raced past the
 // pending buffer. Session-scoped (module state resets on process restart).
@@ -339,6 +356,8 @@ async function flushPromptHistory(retries: number): Promise<void> {
   isWriting = true
 
   try {
+    // Purge expired entries before flushing to prevent stale data accumulation
+    purgeExpiredPendingEntries()
     await immediateFlushHistory()
   } finally {
     isWriting = false
@@ -418,7 +437,20 @@ export function addToHistory(command: HistoryEntry | string): void {
   // Register cleanup on first use
   if (!cleanupRegistered) {
     cleanupRegistered = true
+
+    // Periodic TTL cleanup to prevent unbounded memory growth when no prompts arrive
+    const PURGE_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+    purgeInterval = setInterval(purgeExpiredPendingEntries, PURGE_INTERVAL_MS)
+    if (purgeInterval.unref) purgeInterval.unref()
+
     registerCleanup(async () => {
+      // Stop periodic purge timer
+      if (purgeInterval) {
+        clearInterval(purgeInterval)
+        purgeInterval = null
+      }
+      // Purge stale entries before final flush
+      purgeExpiredPendingEntries()
       // If there's an in-progress flush, wait for it
       if (currentFlushPromise) {
         await currentFlushPromise

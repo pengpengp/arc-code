@@ -21,6 +21,7 @@ import { subprocessEnv } from '../../utils/subprocessEnv.js'
 export type LSPClient = {
   readonly capabilities: ServerCapabilities | undefined
   readonly isInitialized: boolean
+  readonly pid: number | undefined
   start: (
     command: string,
     args: string[],
@@ -83,6 +84,10 @@ export function createLSPClient(
 
     get isInitialized(): boolean {
       return isInitialized
+    },
+
+    get pid(): number | undefined {
+      return process?.pid
     },
 
     async start(

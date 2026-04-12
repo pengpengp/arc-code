@@ -25,6 +25,7 @@ import type { ToolUseContext } from '../../Tool.js'
 import { logEvent } from '../analytics/index.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../analytics/growthbook.js'
 import { isAutoMemoryEnabled, getAutoMemPath } from '../../memdir/paths.js'
+import { runMemoryArchival } from '../../memdir/memoryArchival.js'
 import { isAutoDreamEnabled } from './config.js'
 import { getProjectDir } from '../../utils/sessionStorage.js'
 import {
@@ -233,6 +234,37 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
       })
 
       completeDreamTask(taskId, setAppState)
+
+      // Run memory archival as part of nightly consolidation
+      // (distills old daily logs, archives stale memory files)
+      const MAX_ARCHIVAL_FAILURES = 3
+      try {
+        const memoryRoot = getAutoMemPath()
+        const archivalResult = await runMemoryArchival(memoryRoot)
+        // Reset failure tracking on success
+        ;(globalThis as Record<string, unknown>).__dreamArchivalFailures = 0
+        if (archivalResult.distilled.logsRemoved > 0 || archivalResult.archived.archived > 0) {
+          logForDebugging(
+            `[autoDream] archival — distilled: ${archivalResult.distilled.distilled} months, ` +
+              `logs removed: ${archivalResult.distilled.logsRemoved}, ` +
+              `files archived: ${archivalResult.archived.archived}, ` +
+              `space freed: ${archivalResult.archived.sizeFreed} bytes`,
+          )
+        }
+      } catch (e: unknown) {
+        const failures = ((globalThis as Record<string, unknown>).__dreamArchivalFailures as number | undefined) ?? 0
+        const newCount = failures + 1
+        ;(globalThis as Record<string, unknown>).__dreamArchivalFailures = newCount
+        logForDebugging(
+          `[autoDream] memory archival failed (${newCount}/${MAX_ARCHIVAL_FAILURES}): ${(e as Error).message}`,
+        )
+        if (newCount >= MAX_ARCHIVAL_FAILURES) {
+          logForDebugging(
+            `[autoDream] archival failing repeatedly — memory files may grow unbounded. Error: ${(e as Error).message}`,
+          )
+        }
+      }
+
       // Inline completion summary in the main transcript (same surface as
       // extractMemories's "Saved N memories" message).
       const dreamState = context.toolUseContext.getAppState().tasks?.[taskId]

@@ -79,6 +79,7 @@ const coordinatorModeModule = feature('COORDINATOR_MODE') ? require('./coordinat
 /* eslint-disable @typescript-eslint/no-require-imports */
 const assistantModule = feature('KAIROS') ? require('./assistant/index.js') as typeof import('./assistant/index.js') : null;
 const kairosGate = feature('KAIROS') ? require('./assistant/gate.js') as typeof import('./assistant/gate.js') : null;
+const dreamModule = feature('KAIROS_DREAM') ? require('./dream.js') as typeof import('./dream.js') : null;
 import { relative, resolve } from 'path';
 import { isAnalyticsDisabled } from 'src/services/analytics/config.js';
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js';
@@ -1059,6 +1060,10 @@ async function run(): Promise<CommanderCommand> {
       setKairosActive(true);
       kairosEnabled = true;
     }
+    // Initialize dream mode alongside KAIROS
+    if (feature('KAIROS_DREAM') && dreamModule) {
+      dreamModule.setupDream();
+    }
     if (feature('KAIROS') && (options as {
       assistant?: boolean;
     }).assistant && assistantModule) {
@@ -1877,6 +1882,7 @@ async function run(): Promise<CommanderCommand> {
     // (which returns isProactiveActive()) passes and Sleep is included.
     // The later REPL-path maybeActivateProactive() calls are idempotent.
     maybeActivateProactive(options);
+    maybeActivateDream(options);
     let tools = getTools(toolPermissionContext);
 
     // Apply coordinator mode tool filtering for headless path
@@ -3853,6 +3859,9 @@ async function run(): Promise<CommanderCommand> {
   if (feature('KAIROS')) {
     program.addOption(new Option('--assistant', 'Force assistant mode (Agent SDK daemon use)').hideHelp());
   }
+  if (feature('KAIROS_DREAM') || feature('KAIROS')) {
+    program.addOption(new Option('--dream', 'Enable dream mode for background autonomous task execution'));
+  }
   if (feature('KAIROS') || feature('KAIROS_CHANNELS')) {
     program.addOption(new Option('--channels <servers...>', 'MCP servers whose channel notifications (inbound push) should register this session. Space-separated server names.').hideHelp());
     program.addOption(new Option('--dangerously-load-development-channels <servers...>', 'Load channel servers not on the approved allowlist. For local channel development only. Shows a confirmation dialog at startup.').hideHelp());
@@ -4628,6 +4637,15 @@ function maybeActivateProactive(options: unknown): void {
     const proactiveModule = require('./proactive/index.js');
     if (!proactiveModule.isProactiveActive()) {
       proactiveModule.activateProactive('command');
+    }
+  }
+}
+function maybeActivateDream(options: unknown): void {
+  if ((feature('KAIROS_DREAM') || feature('KAIROS')) && dreamModule && ((options as {
+    dream?: boolean;
+  }).dream || isEnvTruthy(process.env.CLAUDE_CODE_DREAM))) {
+    if (!dreamModule.isDreamActive()) {
+      dreamModule.activateDream('command');
     }
   }
 }

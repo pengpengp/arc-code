@@ -2,6 +2,10 @@ import { feature } from 'bun:bundle'
 import type { UUID } from 'crypto'
 import uniqBy from 'lodash-es/uniqBy.js'
 
+const semanticRelevanceModule = feature('SEMANTIC_COMPACTION')
+  ? (require('./semanticRelevance.js') as typeof import('./semanticRelevance.js'))
+  : null
+
 /* eslint-disable @typescript-eslint/no-require-imports */
 const sessionTranscriptModule = feature('KAIROS')
   ? (require('../sessionTranscript/sessionTranscript.js') as typeof import('../sessionTranscript/sessionTranscript.js'))
@@ -1428,11 +1432,17 @@ export async function createPostCompactFileAttachments(
           toolUseContext.agentId,
         ) && !preservedReadPaths.has(expandPath(file.filename)),
     )
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, maxFiles)
+
+  // Use semantic relevance scoring when SEMANTIC_COMPACTION is enabled,
+  // otherwise fall back to pure recency-based sorting
+  const rankedFiles = semanticRelevanceModule
+    ? semanticRelevanceModule
+        .scoreAndRankFiles(recentFiles)
+        .slice(0, maxFiles)
+    : recentFiles.sort((a, b) => b.timestamp - a.timestamp).slice(0, maxFiles)
 
   const results = await Promise.all(
-    recentFiles.map(async file => {
+    rankedFiles.map(async file => {
       const attachment = await generateFileAttachment(
         file.filename,
         {

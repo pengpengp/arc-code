@@ -14,6 +14,8 @@ const INSIGHTS_FILE = join(PROACTIVE_DIR, 'insights.json')
 const TASKS_FILE = join(PROACTIVE_DIR, 'tasks.json')
 
 let _proactiveState = null
+let _contextBlocked = false
+const _proactiveChangeListeners = new Set<() => void>()
 
 /**
  * Setup proactive mode
@@ -102,7 +104,7 @@ export function addTask(task) {
  * Trigger proactive check - analyze current project state
  */
 export async function triggerProactiveCheck() {
-  if (!_proactiveState || !isProactiveEnabled()) return false
+  if (!_proactiveState || !isProactiveEnabled() || _contextBlocked) return false
 
   const insights = []
 
@@ -201,6 +203,41 @@ export function pauseProactive() {
 }
 
 // Default export for commands/proactive.js compatibility
+
+/**
+ * Set context blocked state — called when context is cleared (/clear)
+ * to resume proactive heartbeat, or when context is blocked to pause it.
+ */
+export function setContextBlocked(blocked: boolean): void {
+  _contextBlocked = blocked
+}
+
+/**
+ * Check if context is currently blocked
+ */
+export function isContextBlocked(): boolean {
+  return _contextBlocked
+}
+
+/**
+ * Subscribe to proactive state changes — for React useSyncExternalStore.
+ */
+export function subscribeToProactiveChanges(listener: () => void): () => void {
+  _proactiveChangeListeners.add(listener)
+  return () => {
+    _proactiveChangeListeners.delete(listener)
+  }
+}
+
+/**
+ * Notify all listeners of state change (called internally when state changes)
+ */
+function notifyProactiveChange(): void {
+  for (const listener of _proactiveChangeListeners) {
+    listener()
+  }
+}
+
 export default {
   name: 'proactive',
   description: 'Toggle proactive mode',

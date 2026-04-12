@@ -42,13 +42,13 @@ Run the built binary with `./cli` or `./cli-dev`. Set `ANTHROPIC_API_KEY` in the
   - src/voice/: voice input
   - src/tasks/: background task management
 
-### KAIROS Subsystem (Active)
+### KAIROS Subsystem (Fully Operational)
 
-Three experimental subsystems are fully enabled in `bun run build:dev:full`:
+All three experimental subsystems are fully implemented and wired:
 
-- **KAIROS** (Persistent Assistant): Cross-session memory via `src/memdir/`, assistant state in `src/assistant/`. Activated by `setKairosActive(true)` in `src/main.tsx`.
-- **KAIROS_DREAM** (Background Autonomous Tasks): Claude works on tasks independently. Entry point `src/dream.ts`.
-- **PROACTIVE** (Proactive Issue Detection): Entry point `src/proactive/`. GrowthBook gates bypassed for non-ant builds.
+- **KAIROS** (Persistent Assistant): Cross-session memory via `src/memdir/`, assistant state in `src/assistant/`. Activated by `setKairosActive(true)` in `src/main.tsx`. Includes memory system, session tracking, GrowthBook gate bypass for non-ant builds.
+- **KAIROS_DREAM** (Background Autonomous Tasks): Claude works on tasks independently. Entry point `src/dream.ts` with task queue, subprocess execution, result consolidation, and autoDream integration via `stopHooks.ts`. `--dream` CLI flag + `CLAUDE_CODE_DREAM=1` env var.
+- **PROACTIVE** (Proactive Issue Detection): Entry point `src/proactive/`. GrowthBook gates bypassed for non-ant builds. Detects uncommitted changes, stale dependencies, build errors. Includes `setContextBlocked()` for context-aware pausing, `subscribeToProactiveChanges()` for React state sync. `--proactive` CLI flag + `CLAUDE_CODE_PROACTIVE=1` env var.
 
 ## Build system
 
@@ -82,6 +82,8 @@ Handled early in `src/entrypoints/cli.tsx` before loading full CLI:
 - `./cli --update` / `--upgrade` (redirected to update subcommand)
 - `./cli --bare` (sets CLAUDE_CODE_SIMPLE=1 early)
 - `./cli --assistant` (force KAIROS assistant mode — persistent cross-session memory, daily check-ins, brief UI)
+- `./cli --dream` (enable dream mode for background autonomous task execution)
+- `./cli --proactive` (start in proactive autonomous mode)
 
 ### KAIROS / Assistant Mode
 
@@ -90,6 +92,21 @@ The `--assistant` flag (or auto-enabled for non-ant builds) activates:
 - **Session continuity**: Assistant remembers context across restarts
 - **Brief view**: Simplified single-line status bar UI
 - **Auto-backgrounding**: Long commands (>5s) moved to background to keep assistant responsive
+
+### KAIROS / Dream Mode
+
+The `--dream` flag or `CLAUDE_CODE_DREAM=1` env var activates:
+- **Task queue**: `~/.claude/dream/queue.json` for pending tasks
+- **Subprocess execution**: Each task spawns independent `cli-dev --print` subprocess
+- **Result consolidation**: Completed results saved to `~/.claude/dream/results.json`
+- **autoDream integration**: Automatic background consolidation on query end via `stopHooks.ts`
+
+### KAIROS / Proactive Mode
+
+The `--proactive` flag or `CLAUDE_CODE_PROACTIVE=1` env var activates:
+- **Issue detection**: Uncommitted changes, stale dependencies, build errors, test failures
+- **Context awareness**: Auto-pauses during `/clear` or builds, resumes after completion
+- **Insight management**: Proactive suggestions with dismiss/acknowledge workflow
 
 ## Important notes
 
