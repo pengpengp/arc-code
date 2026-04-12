@@ -7,12 +7,31 @@ import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { getClaudeConfigHomeDir } from './utils/envUtils.js'
 import { logForDebugging } from './utils/debug.js'
+import { spawn } from 'child_process'
 
 const DREAM_DIR = join(getClaudeConfigHomeDir(), 'dream')
 const DREAM_QUEUE_FILE = join(DREAM_DIR, 'queue.json')
 const DREAM_RESULTS_FILE = join(DREAM_DIR, 'results.json')
 
-let _dreamState = null
+export interface DreamTask {
+  id?: string
+  description: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  queuedAt?: string
+  startedAt?: string
+  completedAt?: string
+  result?: { summary?: string; output?: string }
+  error?: string
+  maxDurationMinutes?: number
+}
+
+interface DreamState {
+  enabled: boolean
+  queue: DreamTask[]
+  results: DreamTask[]
+}
+
+let _dreamState: DreamState | null = null
 
 /**
  * Initialize dream mode
@@ -73,7 +92,7 @@ function saveDreamState(state) {
 /**
  * Queue a dream task
  */
-export function queueDreamTask(task) {
+export function queueDreamTask(task: DreamTask) {
   if (!_dreamState) setupDream()
   _dreamState.queue.push({
     ...task,
@@ -83,6 +102,38 @@ export function queueDreamTask(task) {
   })
   saveDreamState(_dreamState)
   logForDebugging(`Dream task queued: ${task.description}`)
+}
+
+/**
+ * Process a single dream task by spawning a headless Claude Code subprocess.
+ */
+async function executeDreamTask(task: DreamTask): Promise<{ output: string; exitCode: number }> {
+  return new Promise((resolve) => {
+    const cliPath = process.env.CLAUDE_CODE_CLI || join(process.cwd(), 'cli-dev')
+    const timeoutMs = (task.maxDurationMinutes || 30) * 60 * 1000
+
+    const child = spawn(cliPath, [
+      '--print',
+      task.description,
+      '--dangerously-skip-permissions',
+    ], {
+      env: { ...process.env, CLAUDE_CODE_MODE: 'dream' },
+      cwd: process.cwd(),
+      timeout: timeoutMs,
+    })
+
+    let output = ''
+    child.stdout?.on('data', (chunk: Buffer) => { output += chunk.toString() })
+    child.stderr?.on('data', (chunk: Buffer) => { output += chunk.toString() })
+
+    child.on('close', (code: number) => {
+      resolve({ output, exitCode: code ?? 1 })
+    })
+
+    child.on('error', () => {
+      resolve({ output, exitCode: 1 })
+    })
+  })
 }
 
 /**
@@ -98,13 +149,22 @@ export async function processDreamTasks() {
     saveDreamState(_dreamState)
 
     try {
-      // Process task (in real implementation, this would spawn a background agent)
-      task.status = 'completed'
+      const { output, exitCode } = await executeDreamTask(task)
+      task.status = exitCode === 0 ? 'completed' : 'failed'
       task.completedAt = new Date().toISOString()
-      task.result = { summary: `Task "${task.description}" processed.` }
+      task.result = {
+        summary: exitCode === 0
+          ? `Task "${task.description}" completed successfully.`
+          : `Task "${task.description}" failed with exit code ${exitCode}.`,
+        output: output.slice(-2000), // Keep last 2000 chars
+      }
+      if (exitCode !== 0) {
+        task.error = `Exit code ${exitCode}`
+      }
     } catch (err) {
       task.status = 'failed'
-      task.error = err.message
+      task.error = err instanceof Error ? err.message : String(err)
+      task.completedAt = new Date().toISOString()
     }
 
     saveDreamState(_dreamState)
