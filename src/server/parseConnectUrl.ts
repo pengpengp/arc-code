@@ -1,40 +1,58 @@
 /**
- * Parse cc:// and cc+unix:// direct-connect URLs.
+ * Parse cc:// or cc+unix:// connection URLs.
+ * Used by DIRECT_CONNECT feature flag.
  *
- * Formats:
- *   cc://host:port?auth_token=TOKEN
- *   cc://host?auth_token=TOKEN
- *   cc+unix:///path/to/socket?auth_token=TOKEN
- *
- * Returns { serverUrl, authToken } or null if the URL is malformed.
+ * URL formats:
+ *   cc://host:port?token=xxx&tls=true|false
+ *   cc+unix:///path/to/socket?token=xxx
+ *   cc://host:port/authToken
  */
-export function parseConnectUrl(url: string): { serverUrl: string; authToken: string } | null {
-  if (!url || typeof url !== 'string') return null;
 
-  try {
-    const parsed = new URL(url);
+export type ParsedConnectUrl = {
+  serverUrl: string
+  authToken: string | undefined
+  tls: boolean
+  isUnix: boolean
+}
 
-    if (parsed.protocol === 'cc:') {
-      // cc://host:port?auth_token=TOKEN
-      const authToken = parsed.searchParams.get('auth_token');
-      if (!authToken) return null;
-
-      const serverUrl = `http://${parsed.host}`;
-      return { serverUrl, authToken };
+export function parseConnectUrl(url: string): ParsedConnectUrl {
+  if (url.startsWith('cc+unix://')) {
+    // Unix socket: cc+unix:///path/to/socket?token=xxx
+    const withoutPrefix = url.slice('cc+unix://'.length)
+    const [path, queryString] = withoutPrefix.split('?')
+    const params = new URLSearchParams(queryString || '')
+    return {
+      serverUrl: `unix:${path}`,
+      authToken: params.get('token') ?? undefined,
+      tls: false,
+      isUnix: true,
     }
+  }
 
-    if (parsed.protocol === 'cc+unix:') {
-      // cc+unix:///path/to/socket?auth_token=TOKEN
-      const authToken = parsed.searchParams.get('auth_token');
-      if (!authToken) return null;
-
-      // Unix socket: use the path as the server identifier
-      const serverUrl = `unix:${parsed.pathname}`;
-      return { serverUrl, authToken };
+  if (url.startsWith('cc://')) {
+    // TCP: cc://host:port?token=xxx&tls=true
+    // or: cc://host:port/authToken
+    const withoutPrefix = url.slice('cc://'.length)
+    const [hostPart, rest] = withoutPrefix.split('?')
+    const [hostAndPort, pathToken] = (hostPart || '').split('/')
+    const params = new URLSearchParams(rest || '')
+    
+    const token = params.get('token') ?? pathToken ?? undefined
+    const tlsParam = params.get('tls')
+    
+    return {
+      serverUrl: `http${tlsParam === 'true' ? 's' : ''}://${hostAndPort}`,
+      authToken: token,
+      tls: tlsParam === 'true',
+      isUnix: false,
     }
+  }
 
-    return null;
-  } catch {
-    return null;
+  // Fallback: treat as plain URL
+  return {
+    serverUrl: url,
+    authToken: undefined,
+    tls: false,
+    isUnix: false,
   }
 }

@@ -1,1 +1,31 @@
-# External permissions template
+## Default Rules for External Environments
+
+These are the default allow/deny rules used in non-Anthropic builds.
+User settings REPLACE the sections between the tags below.
+
+<user_allow_rules_to_replace>
+- Read, write, and create files within the current working directory
+- Run git operations (status, diff, log, add, commit, push) on the current branch
+- Build, test, and lint the project using standard tooling
+- Install project dependencies (npm install, pip install, etc.)
+- Start local development servers on localhost only
+- Use grep, find, ls, and similar search tools within the working directory
+</user_allow_rules_to_replace>
+
+<user_deny_rules_to_replace>
+- Execute code downloaded from external URLs without explicit user confirmation
+- Modify files outside the working directory unless explicitly requested
+- Install system-wide packages or modify system configuration
+- Open network ports to non-localhost addresses
+- Read sensitive credential files (~/.ssh, ~/.aws/credentials, .env files)
+- Run destructive git operations (push --force, reset --hard) on shared branches
+- Kill processes not started by the assistant
+- Modify shell configuration files (.bashrc, .zshrc, .profile) unless requested
+</user_deny_rules_to_replace>
+
+<user_environment_to_replace>
+- Development machine (macOS/Linux/Windows workstation)
+- Single-user environment
+- Project directory is the primary working directory
+- Standard developer tools are expected to be available
+</user_environment_to_replace>

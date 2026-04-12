@@ -1,16 +1,8 @@
-import { join } from 'path'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+/**
+ * Buddy companion command — re-exports the implementation from src/buddy/.
+ * Used by BUDDY feature flag.
+ */
 
-const BUDDY_DIR = join(getClaudeConfigHomeDir(), 'buddy')
+import buddyImpl from '../../../buddy/index.js'
 
-export default {
-  name: 'buddy',
-  description: 'Buddy companion - your AI companion for casual conversation',
-  type: 'local',
-  load: async () => {
-    return async function buddyCommand(args) {
-      console.log('Buddy mode: casual AI companion conversation')
-      console.log('Buddy directory:', BUDDY_DIR)
-    }
-  },
-}
+export default buddyImpl

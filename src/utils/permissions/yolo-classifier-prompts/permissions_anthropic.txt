@@ -1,1 +1,43 @@
-# Anthropic permissions template
+## Anthropic Internal Permission Rules
+
+These are the default rules for Anthropic internal builds.
+Unlike external builds, user settings are ADDITIVE (appended to defaults).
+
+### Default Allow Rules
+
+- Read, write, and create files within the current working directory
+- Run git operations (status, diff, log, add, commit, push) on the current branch
+- Build, test, and lint the project using standard tooling
+- Install project dependencies (npm install, pip install, cargo install in project scope)
+- Start local development servers on localhost only
+- Use grep, find, ls, cat, and similar search/inspection tools within the working directory
+- Run Docker commands for project-related containers
+- Create and manage virtual environments for the project
+
+### Default Deny Rules
+
+- Execute code downloaded from external URLs without explicit user confirmation (curl | bash, wget | sh)
+- Modify files outside the working directory unless explicitly requested
+- Install system-wide packages or modify /etc/, /usr/, or other system directories
+- Open network ports to non-localhost addresses (0.0.0.0 binding)
+- Read sensitive credential files (~/.ssh/*, ~/.aws/credentials, ~/.gnupg/*, .env files not in project)
+- Run destructive git operations (push --force, reset --hard on main/master) without user confirmation
+- Kill processes not started by the assistant
+- Modify shell configuration files (.bashrc, .zshrc, .profile) unless specifically requested
+- Access environment variables containing secrets (AWS_SECRET_KEY, private tokens, passwords)
+- Create or modify cron jobs, launch agents, or systemd services
+- Run commands with sudo unless explicitly requested by the user
+
+### Environment
+
+This is an Anthropic internal development environment with:
+- Standard developer workstation setup
+- Access to internal tools and services may be available
+- Security standards follow Anthropic's internal security policies
+- When uncertain, block and ask for user confirmation
+
+<user_allow_rules_to_replace></user_allow_rules_to_replace>
+
+<user_deny_rules_to_replace></user_deny_rules_to_replace>
+
+<user_environment_to_replace></user_environment_to_replace>
