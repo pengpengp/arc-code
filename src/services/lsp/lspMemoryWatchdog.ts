@@ -8,7 +8,7 @@
  * Cross-platform: uses `tasklist` (Windows), `ps` (macOS/Linux).
  */
 
-import { exec } from 'child_process'
+import { execSync } from 'child_process'
 import { logForDebugging } from '../../utils/debug.js'
 import { logError } from '../../utils/log.js'
 
@@ -31,7 +31,7 @@ export function getProcessRSS(pid: number): number | null {
     if (process.platform === 'win32') {
       // tasklist /FI "PID eq <pid>" /FO CSV
       // Output: "Image Name","PID","Session Name","Session#","Mem Usage"
-      const output = require('child_process').execSync(
+      const output = execSync(
         `tasklist /FI "PID eq ${pid}" /FO CSV /NH 2>NUL`,
         { encoding: 'utf-8', timeout: 5000 },
       )
@@ -44,7 +44,7 @@ export function getProcessRSS(pid: number): number | null {
     }
 
     // macOS/Linux: ps -o rss= -p <pid>
-    const output = require('child_process').execSync(
+    const output = execSync(
       `ps -o rss= -p ${pid} 2>/dev/null`,
       { encoding: 'utf-8', timeout: 5000 },
     )

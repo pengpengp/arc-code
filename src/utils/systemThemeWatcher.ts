@@ -1,3 +1,4 @@
+import { logForDebugging } from './debug.js'
 import { isStdinTTY, isStdoutTTY } from './isTTY.js'
 
 export function watchSystemTheme(internal_querier, setSystemTheme) {
@@ -10,7 +11,7 @@ export function watchSystemTheme(internal_querier, setSystemTheme) {
 
   function queryTheme() {
     if (cancelled) return
-    try { process.stdout.write(ESC + ']11;?' + ESC_BS) } catch (e) {}
+    try { process.stdout.write(ESC + ']11;?' + ESC_BS) } catch (e) { logForDebugging(`[theme-watcher] stdout write failed: ${e}`) }
   }
 
   function onData(data) {

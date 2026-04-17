@@ -3172,6 +3172,7 @@ export function REPL({
     try {
       repinScroll();
     } catch (e) {
+      logForDebugging(`[repl] repinScroll failed: ${e}`);
     }
 
     // Resume loop mode if paused
@@ -3179,6 +3180,7 @@ export function REPL({
       try {
         proactiveModule?.resumeProactive();
       } catch (e) {
+        logForDebugging(`[repl] resumeProactive failed: ${e}`);
       }
     }
 
