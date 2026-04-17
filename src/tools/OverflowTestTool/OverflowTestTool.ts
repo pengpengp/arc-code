@@ -44,6 +44,9 @@ export const OverflowTestTool = buildTool({
     utilization_pct: z.number().optional(),
     test_history: z.number().optional(),
   })),
+  async prompt() {
+    return 'Test context overflow behavior and measure token usage.'
+  },
 
   async call(args, _context) {
     const { action, payload_size = 10000 } = args as z.infer<ReturnType<typeof inputSchema>>

@@ -80,6 +80,9 @@ export const SubscribePRTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema: lazySchema(() => z.object({ success: z.boolean(), subscription_id: z.string().optional(), message: z.string() })),
+  async prompt() {
+    return 'Subscribe to GitHub pull request webhook notifications.'
+  },
 
   async call(args, _context) {
     const { repo, pr_number, events } = args as z.infer<ReturnType<typeof inputSchema>>

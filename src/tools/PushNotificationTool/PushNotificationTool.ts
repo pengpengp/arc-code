@@ -86,6 +86,9 @@ export const PushNotificationTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema: lazySchema(() => z.object({ success: z.boolean(), channel: z.string(), message: z.string() })),
+  async prompt() {
+    return 'Send push notification to user for important events.'
+  },
 
   async call(args, _context) {
     const { title, body, priority } = args as z.infer<ReturnType<typeof inputSchema>>

@@ -238,6 +238,11 @@ function ChordInterceptor(t0) {
       if ((key.wheelUp || key.wheelDown) && pendingChordRef.current === null) {
         return;
       }
+      // DEBUG: trace Enter key through ChordInterceptor
+      if (key.return) {
+        const activeArr = [...activeContexts];
+        console.error(`[DEBUG-ENTER] ChordInterceptor: key.return=true, input="${input}", activeContexts=[${activeArr.join(',')}]`);
+      }
       const registry = handlerRegistryRef.current;
       const handlerContexts = new Set();
       if (registry) {
@@ -250,6 +255,9 @@ function ChordInterceptor(t0) {
       const contexts = [...handlerContexts, ...activeContexts, "Global"];
       const wasInChord = pendingChordRef.current !== null;
       const result = resolveKeyWithChordState(input, key, contexts, bindings, pendingChordRef.current);
+      if (key.return) {
+        console.error(`[DEBUG-ENTER] ChordInterceptor result: type="${result.type}", wasInChord=${wasInChord}${result.type === 'match' ? `, action="${result.action}"` : ''}${result.type === 'chord_started' ? `, pending=${JSON.stringify(result.pending)}` : ''}`);
+      }
       bb23: switch (result.type) {
         case "chord_started":
           {

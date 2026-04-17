@@ -19,6 +19,9 @@ export const ReviewArtifactTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema: lazySchema(() => z.object({ success: z.boolean(), message: z.string(), findings: z.array(z.object({ type: z.string(), message: z.string() })).optional() })),
+  async prompt() {
+    return 'Review code changes and generate structured findings.'
+  },
 
   async call(args, context) {
     const { action, files, base_branch } = args

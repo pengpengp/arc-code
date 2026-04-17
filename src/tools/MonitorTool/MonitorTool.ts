@@ -86,6 +86,9 @@ export const MonitorTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema,
+  async prompt() {
+    return 'Monitor MCP servers and service health status.'
+  },
 
   async call(args, context) {
     const { action, target, interval } = args as z.infer<ReturnType<typeof inputSchema>>

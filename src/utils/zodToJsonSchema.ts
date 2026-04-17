@@ -15,6 +15,15 @@ const cache = new WeakMap<ZodTypeAny, JsonSchema7Type>()
  * Converts a Zod v4 schema to JSON Schema format.
  */
 export function zodToJsonSchema(schema: ZodTypeAny): JsonSchema7Type {
+  if (!schema) {
+    // Return empty object schema for undefined/null
+    return { type: 'object', properties: {} }
+  }
+  // Ensure we have a valid Zod v4 schema with ._zod property
+  if ((schema as any)._zod === undefined) {
+    // Input is not a Zod v4 schema - return empty object to avoid crash
+    return { type: 'object', properties: {} }
+  }
   const hit = cache.get(schema)
   if (hit) return hit
   const result = toJSONSchema(schema) as JsonSchema7Type

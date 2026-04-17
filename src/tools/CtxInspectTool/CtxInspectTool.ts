@@ -25,6 +25,9 @@ export const CtxInspectTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema: lazySchema(() => z.object({ success: z.boolean(), message: z.string(), tokens: z.number() })),
+  async prompt() {
+    return 'Inspect conversation context, token usage, and message structure.'
+  },
 
   async call(args, context) {
     const { action, depth = 1 } = args as z.infer<ReturnType<typeof inputSchema>>

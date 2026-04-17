@@ -4,6 +4,7 @@ import { clearSystemPromptSections } from '../../constants/systemPromptSections.
 import { getUserContext } from '../../context.js'
 import { clearSpeculativeChecks } from '../../tools/BashTool/bashPermissions.js'
 import { clearClassifierApprovals } from '../../utils/classifierApprovals.js'
+import { invalidateSysPromptCache } from '../../utils/queryContext.js'
 import { resetGetMemoryFilesCache } from '../../utils/claudemd.js'
 import { clearSessionMessagesCache } from '../../utils/sessionStorage.js'
 import { clearBetaTracingState } from '../../utils/telemetry/betaSessionTracing.js'
@@ -60,6 +61,7 @@ export function runPostCompactCleanup(querySource?: QuerySource): void {
     resetGetMemoryFilesCache('compact')
   }
   clearSystemPromptSections()
+  invalidateSysPromptCache()
   clearClassifierApprovals()
   clearSpeculativeChecks()
   // Intentionally NOT calling resetSentSkillNames(): re-injecting the full

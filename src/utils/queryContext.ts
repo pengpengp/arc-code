@@ -27,6 +27,40 @@ import {
   type ThinkingConfig,
 } from './thinking.js'
 
+// --- Cross-turn system prompt memoization ---
+//
+// getSystemPrompt() is expensive: it serializes tool schemas, reads CLAUDE.md
+// files, runs git status, and assembles 10+ sections. Most turns don't change
+// the inputs, so we can reuse the previous result.
+//
+// The cache key is a hash of: tool names (sorted), model ID, additional dirs
+// (sorted), MCP client names (sorted). When none of these change, the result
+// is returned synchronously without re-invoking getSystemPrompt().
+
+type SysPromptCacheEntry = {
+  key: string
+  result: {
+    defaultSystemPrompt: string[]
+    userContext: { [k: string]: string }
+    systemContext: { [k: string]: string }
+  }
+}
+
+let sysPromptCrossTurnCache: SysPromptCacheEntry | null = null
+
+/** Build a stable cache key from the system prompt inputs. */
+function buildSysPromptCacheKey(
+  tools: Tools,
+  mainLoopModel: string,
+  additionalWorkingDirectories: string[],
+  mcpClients: MCPServerConnection[],
+): string {
+  const toolNames = tools.map(t => t.name).sort().join(',')
+  const dirs = [...additionalWorkingDirectories].sort().join('|')
+  const mcpNames = mcpClients.map(c => c.name).sort().join(',')
+  return `${toolNames}\x00${mainLoopModel}\x00${dirs}\x00${mcpNames}`
+}
+
 /**
  * Fetch the three context pieces that form the API cache-key prefix:
  * systemPrompt parts, userContext, systemContext.
@@ -35,6 +69,11 @@ import {
  * getSystemContext are skipped — the custom prompt replaces the default
  * entirely, and systemContext would be appended to a default that isn't
  * being used.
+ *
+ * Cross-turn memoization: if tools, model, additional directories, and MCP
+ * clients haven't changed since the last call, the previous result is reused
+ * without recomputing. This saves ~50-200ms per turn (tool schema serialization
+ * + CLAUDE.md reads + git status).
  *
  * Callers assemble the final systemPrompt from defaultSystemPrompt (or
  * customSystemPrompt) + optional extras + appendSystemPrompt. QueryEngine
@@ -58,19 +97,48 @@ export async function fetchSystemPromptParts({
   userContext: { [k: string]: string }
   systemContext: { [k: string]: string }
 }> {
+  // Custom prompt: skip memoization — caller is overriding everything.
+  if (customSystemPrompt !== undefined) {
+    const [userContext] = await Promise.all([getUserContext()])
+    return { defaultSystemPrompt: [], userContext, systemContext: {} }
+  }
+
+  const cacheKey = buildSysPromptCacheKey(
+    tools,
+    mainLoopModel,
+    additionalWorkingDirectories,
+    mcpClients,
+  )
+
+  // Cache hit: reuse previous turn's system prompt (no recomputation needed).
+  if (sysPromptCrossTurnCache !== null && sysPromptCrossTurnCache.key === cacheKey) {
+    return sysPromptCrossTurnCache.result
+  }
+
+  // Cache miss: rebuild all three parts in parallel.
   const [defaultSystemPrompt, userContext, systemContext] = await Promise.all([
-    customSystemPrompt !== undefined
-      ? Promise.resolve([])
-      : getSystemPrompt(
-          tools,
-          mainLoopModel,
-          additionalWorkingDirectories,
-          mcpClients,
-        ),
+    getSystemPrompt(
+      tools,
+      mainLoopModel,
+      additionalWorkingDirectories,
+      mcpClients,
+    ),
     getUserContext(),
-    customSystemPrompt !== undefined ? Promise.resolve({}) : getSystemContext(),
+    getSystemContext(),
   ])
+
+  // Store for next turn.
+  sysPromptCrossTurnCache = {
+    key: cacheKey,
+    result: { defaultSystemPrompt, userContext, systemContext },
+  }
+
   return { defaultSystemPrompt, userContext, systemContext }
+}
+
+/** Clear the cross-turn system prompt cache. Call alongside clearSystemPromptSections() on /clear, /compact, and other cache-busting events. */
+export function invalidateSysPromptCache(): void {
+  sysPromptCrossTurnCache = null
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   type LSPServerManager,
 } from './LSPServerManager.js'
 import { registerLSPNotificationHandlers } from './passiveFeedback.js'
+import { startMemoryWatchdog, watchLSPServer } from './lspMemoryWatchdog.js'
 
 /**
  * Initialization state of the LSP server manager
@@ -189,6 +190,12 @@ export function initializeLspServerManager(): void {
         if (lspManagerInstance) {
           registerLSPNotificationHandlers(lspManagerInstance)
         }
+
+        // Register all servers with the memory watchdog
+        for (const [name, server] of lspManagerInstance.getAllServers()) {
+          watchLSPServer(name, () => server.pid, () => server.restart())
+        }
+        startMemoryWatchdog()
       }
     })
     .catch((error: unknown) => {

@@ -344,6 +344,10 @@ export async function setup(
             './constants/systemPromptSections.js'
           )
           clearSystemPromptSections()
+          const { invalidateSysPromptCache } = await import(
+            './utils/queryContext.js'
+          )
+          invalidateSysPromptCache()
         }
       })
     }
@@ -383,13 +387,18 @@ export async function setup(
   // Pre-fetch data for Logo v2 - await to ensure it's ready before logo renders.
   // --bare / SIMPLE: skip — release notes are interactive-UI display data,
   // and getRecentActivity() reads up to 10 session JSONL files.
+  // Parallelized: fire both git I/O and session-file reads concurrently,
+  // but only await getRecentActivity when release notes are present.
   if (!isBareMode()) {
+    const recentActivity = getRecentActivity() // fire immediately, don't block
     const { hasReleaseNotes } = await checkForReleaseNotes(
       getGlobalConfig().lastReleaseNotesSeen,
     )
     if (hasReleaseNotes) {
-      await getRecentActivity()
+      await recentActivity
     }
+    // If no release notes, recentActivity is wasted — but it's already
+    // resolved (session file reads are fast) so no harm done.
   }
 
   // If permission mode is set to bypass, verify we're in a safe environment

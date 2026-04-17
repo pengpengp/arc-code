@@ -1091,10 +1091,6 @@ async function run(): Promise<CommanderCommand> {
         // pre-entitled).
         kairosEnabled = assistantModule.isAssistantForced() || (await kairosGate.isKairosEnabled());
         if (kairosEnabled) {
-          const opts = options as {
-            brief?: boolean;
-          };
-          opts.brief = true;
           setKairosActive(true);
           // Pre-seed an in-process team so Agent(name: "foo") spawns
           // teammates without TeamCreate. Must run BEFORE setup() captures
@@ -2190,25 +2186,11 @@ async function run(): Promise<CommanderCommand> {
       }
     }
     maybeActivateBrief(options);
-    // defaultView: 'chat' is a persisted opt-in — check entitlement and set
-    // userMsgOptIn so the tool + prompt section activate. Interactive-only:
-    // defaultView is a display preference; SDK sessions have no display, and
-    // the assistant installer writes defaultView:'chat' to settings.local.json
-    // which would otherwise leak into --print sessions in the same directory.
-    // Runs right after maybeActivateBrief() so all startup opt-in paths fire
-    // BEFORE any isBriefEnabled() read below (proactive prompt's
-    // briefVisibility). A persisted 'chat' after a GB kill-switch falls
-    // through (entitlement fails).
-    if ((feature('KAIROS') || feature('KAIROS_BRIEF')) && !getIsNonInteractiveSession() && !getUserMsgOptIn() && getInitialSettings().defaultView === 'chat') {
-      /* eslint-disable @typescript-eslint/no-require-imports */
-      const {
-        isBriefEntitled
-      } = require('./tools/BriefTool/BriefTool.js') as typeof import('./tools/BriefTool/BriefTool.js');
-      /* eslint-enable @typescript-eslint/no-require-imports */
-      if (isBriefEntitled()) {
-        setUserMsgOptIn(true);
-      }
-    }
+    // Brief mode: only activate with explicit opt-in (--brief flag,
+    // CLAUDE_CODE_BRIEF env var, or remote/assistant session). Do NOT
+    // auto-enable for local REPL sessions — filterForBriefTool hides all
+    // assistant text when isBriefOnly=true, leaving only tool calls visible.
+    // The defaultView:'chat' path was activating it unintentionally.
     // Coordinator mode has its own system prompt and filters out Sleep, so
     // the generic proactive prompt would tell it to call a tool it can't
     // access and conflict with delegation instructions.
@@ -2676,20 +2658,17 @@ async function run(): Promise<CommanderCommand> {
         void checkAndDisableBypassPermissions(toolPermissionContext);
       }
 
-      // Async check of auto mode gate — corrects state and disables auto if needed.
+      // Sync check of auto mode gate — corrects state and disables auto if needed.
       // Gated on TRANSCRIPT_CLASSIFIER (not USER_TYPE) so GrowthBook kill switch runs for external builds too.
       if (feature('TRANSCRIPT_CLASSIFIER')) {
-        void verifyAutoModeGateAccess(toolPermissionContext, headlessStore.getState().fastMode).then(({
-          updateContext
-        }) => {
-          headlessStore.setState(prev => {
-            const nextCtx = updateContext(prev.toolPermissionContext);
-            if (nextCtx === prev.toolPermissionContext) return prev;
-            return {
-              ...prev,
-              toolPermissionContext: nextCtx
-            };
-          });
+        const { updateContext } = verifyAutoModeGateAccess(toolPermissionContext, headlessStore.getState().fastMode);
+        headlessStore.setState(prev => {
+          const nextCtx = updateContext(prev.toolPermissionContext);
+          if (nextCtx === prev.toolPermissionContext) return prev;
+          return {
+            ...prev,
+            toolPermissionContext: nextCtx
+          };
         });
       }
 

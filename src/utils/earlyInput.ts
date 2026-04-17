@@ -48,7 +48,7 @@ export function startCapturingEarlyInput(): void {
   try {
     process.stdin.setEncoding('utf8')
     process.stdin.setRawMode(true)
-    process.stdin.ref()
+    process.stdin.ref?.()
 
     readableHandler = () => {
       let chunk = process.stdin.read()

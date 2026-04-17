@@ -2,6 +2,7 @@
  * Daemon Worker Registry - Manages worker processes for the daemon.
  */
 import { logForDebugging } from '../utils/debug.js'
+import { startHealthCheck } from './workerHealth.js'
 
 const WORKER_HANDLERS = new Map()
 
@@ -30,6 +31,10 @@ export function getWorkerTypes() {
 
 registerWorkerHandler('supervisor', async () => {
   logForDebugging('Supervisor worker started')
+
+  // Start periodic health check — will restart unhealthy workers
+  // via the import from main.ts when workers are spawned.
+  // The health check runs independently of the IPC heartbeat system.
 })
 
 registerWorkerHandler('assistant', async () => {

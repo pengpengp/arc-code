@@ -42,6 +42,7 @@ const NEWLINE = { type: 'stdout', content: '\n' } as const
 
 export class LogUpdate {
   private state: State
+  private _lastResizeResetAt: number | undefined
 
   constructor(private readonly options: Options) {
     this.state = {
@@ -133,17 +134,24 @@ export class LogUpdate {
     const startTime = performance.now()
     const stylePool = this.options.stylePool
 
-    // Since we assume the cursor is at the bottom on the screen, we only need
-    // to clear when the viewport gets shorter (i.e. the cursor position drifts)
-    // or when it gets thinner (and text wraps). We _could_ figure out how to
-    // not reset here but that would involve predicting the current layout
-    // _after_ the viewport change which means calcuating text wrapping.
-    // Resizing is a rare enough event that it's not practically a big issue.
+    // Resize-triggered full reset: debounce to avoid cascading clears when
+    // the terminal emits 2+ rapid SIGWINCH events for a single user resize.
+    // Without debouncing, each event fires this branch → clearTerminal →
+    // full repaint → visible blank→paint flicker per event.
+    //
+    // We use a monotonic cooldown: skip the full reset if one was already
+    // triggered within the last 150ms. During cooldown the diff loop below
+    // handles incremental changes — more bytes, but no visible flicker.
     if (
       next.viewport.height < prev.viewport.height ||
       (prev.viewport.width !== 0 && next.viewport.width !== prev.viewport.width)
     ) {
-      return fullResetSequence_CAUSES_FLICKER(next, 'resize', stylePool)
+      const now = performance.now()
+      if (this._lastResizeResetAt === undefined || now - this._lastResizeResetAt > 150) {
+        this._lastResizeResetAt = now
+        return fullResetSequence_CAUSES_FLICKER(next, 'resize', stylePool)
+      }
+      // Cooldown active: fall through to diff loop for incremental update
     }
 
     // DECSTBM scroll optimization: when a ScrollBox's scrollTop changed,

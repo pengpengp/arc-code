@@ -119,6 +119,22 @@ The `--proactive` flag or `CLAUDE_CODE_PROACTIVE=1` env var activates:
 - **Cross-platform TTY detection**: `src/utils/isTTY.ts` provides `isStdoutTTY()` and `isStdinTTY()` with `TERM` env fallback for Git Bash/MSYS2 where `process.stdout.isTTY` is `undefined`. Always use these utilities instead of raw `isTTY` checks.
 - **Package bin aliases**: `claude` and `claude-source` both point to `./cli` in package.json.
 
+### Known Issue: dev-full build brief mode auto-activation (FIXED 2026-04-15)
+
+**Symptom**: In `dev-full` build, sending a message (e.g., "hello") resulted in no assistant response — the query completed successfully but all assistant text was hidden in the UI.
+
+**Root cause chain**:
+1. `src/main.tsx:1097` — KAIROS activation auto-set `opts.brief = true` for non-ant builds
+2. `maybeActivateBrief()` → `setUserMsgOptIn(true)` → `initialIsBriefOnly = true`
+3. `filterForBriefTool()` in `src/components/Messages.tsx:112-158` dropped ALL assistant text messages (line 138: `return false` for non-tool-use assistant messages)
+4. Only tool calls and user input survived the filter, leaving the assistant response invisible
+
+**Fix**: Removed the automatic `opts.brief = true` from the KAIROS activation block in `src/main.tsx`. Brief mode now requires explicit opt-in via `--brief` flag, `CLAUDE_CODE_BRIEF` env var, or remote/assistant session. KAIROS memory features remain intact via `setKairosActive(true)`.
+
+**Debugging approach**: Used `enter-debug.log` to trace the message pipeline: `normalizedMessages → compact → noProgress → brief → show → grouped → collapsed`. The `brief` step dropped 18→4 messages, and `isBriefOnly=true` in the component log confirmed brief mode was active unintentionally.
+
+**Prevention**: When working with feature flags that control UI filtering (especially `KAIROS`, `KAIROS_BRIEF`), verify that the flag combination doesn't unintentionally enable restrictive display modes in `dev-full` builds. The `filterForBriefTool` function is aggressive — it only shows tool_use blocks and user input, hiding all assistant text.
+
 ## Supported model providers
 
 Set environment variables to switch providers:

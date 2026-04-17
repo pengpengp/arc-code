@@ -31,6 +31,7 @@ import { hasCursorUpViewportYankBug } from '../ink/terminal.js';
 import { createFileStateCacheWithSizeLimit, mergeFileStateCaches, READ_FILE_STATE_CACHE_SIZE } from '../utils/fileStateCache.js';
 import { updateLastInteractionTime, getLastInteractionTime, getOriginalCwd, getProjectRoot, getSessionId, switchSession, setCostStateForRestore, getTurnHookDurationMs, getTurnHookCount, resetTurnHookDuration, getTurnToolDurationMs, getTurnToolCount, resetTurnToolDuration, getTurnClassifierDurationMs, getTurnClassifierCount, resetTurnClassifierDuration } from '../bootstrap/state.js';
 import { asSessionId, asAgentId } from '../types/ids.js';
+import * as fs from 'fs';
 import { logForDebugging } from '../utils/debug.js';
 import { QueryGuard } from '../utils/QueryGuard.js';
 import { isEnvTruthy } from '../utils/envUtils.js';
@@ -218,9 +219,9 @@ import { EffortCallout, shouldShowEffortCallout } from '../components/EffortCall
 import type { EffortValue } from '../utils/effort.js';
 import { RemoteCallout } from '../components/RemoteCallout.js';
 /* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
-const AntModelSwitchCallout = "external" === 'ant' ? require('../components/AntModelSwitchCallout.js').AntModelSwitchCallout : null;
-const shouldShowAntModelSwitch = "external" === 'ant' ? require('../components/AntModelSwitchCallout.js').shouldShowModelSwitchCallout : (): boolean => false;
-const UndercoverAutoCallout = "external" === 'ant' ? require('../components/UndercoverAutoCallout.js').UndercoverAutoCallout : null;
+const AntModelSwitchCallout: any = null;
+const shouldShowAntModelSwitch = (): boolean => false;
+const UndercoverAutoCallout: any = null;
 /* eslint-enable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 import { activityManager } from '../utils/activityManager.js';
 import { createAbortController } from '../utils/abortController.js';
@@ -272,7 +273,7 @@ import { TungstenLiveMonitor } from '../tools/TungstenTool/TungstenLiveMonitor.j
 const WebBrowserPanelModule = feature('WEB_BROWSER_TOOL') ? require('../tools/WebBrowserTool/WebBrowserPanel.js') as typeof import('../tools/WebBrowserTool/WebBrowserPanel.js') : null;
 const UltraplanLaunchDialog: typeof import('../components/UltraplanLaunchDialog.js').UltraplanLaunchDialog = feature('ULTRAPLAN') ? require('../components/UltraplanLaunchDialog.js').UltraplanLaunchDialog : () => null;
 const UltraplanChoiceDialog: typeof import('../components/UltraplanChoiceDialog.js').UltraplanChoiceDialog = feature('ULTRAPLAN') ? require('../components/UltraplanChoiceDialog.js').UltraplanChoiceDialog : () => null;
-const launchUltraplan: typeof import('../commands/ultraplan.js').launchUltraplan = feature('ULTRAPLAN') ? require('../commands/ultraplan.js').launchUltraplan : () => Promise.resolve('');
+const launchUltraplan: typeof import('../commands/ultraplan.js').launchUltraplan = () => Promise.resolve('');
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { IssueFlagBanner } from '../components/PromptInput/IssueFlagBanner.js';
 import { useIssueFlagBanner } from '../hooks/useIssueFlagBanner.js';
@@ -2587,6 +2588,7 @@ export function REPL({
   });
   const onQueryEvent = useCallback((event: Parameters<typeof handleMessageFromStream>[0]) => {
     handleMessageFromStream(event, newMessage => {
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] onMessage: type=${newMessage.type}, messages.length=${messagesRef.current.length}\n`); } catch {}
       if (isCompactBoundaryMessage(newMessage)) {
         // Fullscreen: keep pre-compact messages for scrollback. query.ts
         // slices at the boundary for API calls, Messages.tsx skips the
@@ -2663,6 +2665,7 @@ export function REPL({
     }, onStreamingText);
   }, [setMessages, setResponseLength, setStreamMode, setStreamingToolUses, setStreamingThinking, onStreamingText]);
   const onQueryImpl = useCallback(async (messagesIncludingNewMessages: MessageType[], newMessages: MessageType[], abortController: AbortController, shouldQuery: boolean, additionalAllowedTools: string[], mainLoopModelParam: string, effort?: EffortValue) => {
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] onQueryImpl: shouldQuery=${shouldQuery}\n`); } catch {}
     // Prepare IDE integration for new prompt. Read mcpClients fresh from
     // store — useManageMCPConnections may have populated it since the
     // render that captured this closure (same pattern as computeTools).
@@ -2748,6 +2751,7 @@ export function REPL({
       return;
     }
     const toolUseContext = getToolUseContext(messagesIncludingNewMessages, newMessages, abortController, mainLoopModelParam);
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] onQueryImpl: getToolUseContext returned\n`); } catch {}
     // getToolUseContext reads tools/mcpClients fresh from store.getState()
     // (via computeTools/mergeClients). Use those rather than the closure-
     // captured `tools`/`mcpClients` — useManageMCPConnections may have
@@ -2769,11 +2773,40 @@ export function REPL({
       });
     }
     queryCheckpoint('query_context_loading_start');
-    const [,, defaultSystemPrompt, baseUserContext, systemContext] = await Promise.all([
-    // IMPORTANT: do this after setMessages() above, to avoid UI jank
-    checkAndDisableBypassPermissionsIfNeeded(toolPermissionContext, setAppState),
-    // Gated on TRANSCRIPT_CLASSIFIER so GrowthBook kill switch runs wherever auto mode is built in
-    feature('TRANSCRIPT_CLASSIFIER') ? checkAndDisableAutoModeIfNeeded(toolPermissionContext, setAppState, store.getState().fastMode) : undefined, getSystemPrompt(freshTools, mainLoopModelParam, Array.from(toolPermissionContext.additionalWorkingDirectories.keys()), freshMcpClients), getUserContext(), getSystemContext()]);
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] onQueryImpl: about to load context\n`); } catch {}
+    const [, autoModeResult, defaultSystemPrompt, baseUserContext, systemContext] = await Promise.all([
+      (async () => {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[0]: checkAndDisableBypassPermissionsIfNeeded START\n`); } catch {}
+        await checkAndDisableBypassPermissionsIfNeeded(toolPermissionContext, setAppState);
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[0]: checkAndDisableBypassPermissionsIfNeeded DONE\n`); } catch {}
+      })(),
+      (async () => {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[1]: checkAndDisableAutoModeIfNeeded START\n`); } catch {}
+        if (feature('TRANSCRIPT_CLASSIFIER')) {
+          await checkAndDisableAutoModeIfNeeded(toolPermissionContext, setAppState, store.getState().fastMode);
+        }
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[1]: checkAndDisableAutoModeIfNeeded DONE\n`); } catch {}
+      })(),
+      (async () => {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[2]: getSystemPrompt START\n`); } catch {}
+        const result = await getSystemPrompt(freshTools, mainLoopModelParam, Array.from(toolPermissionContext.additionalWorkingDirectories.keys()), freshMcpClients);
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[2]: getSystemPrompt DONE\n`); } catch {}
+        return result;
+      })(),
+      (async () => {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[3]: getUserContext START\n`); } catch {}
+        const result = await getUserContext();
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[3]: getUserContext DONE\n`); } catch {}
+        return result;
+      })(),
+      (async () => {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[4]: getSystemContext START\n`); } catch {}
+        const result = await getSystemContext();
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] Promise[4]: getSystemContext DONE\n`); } catch {}
+        return result;
+      })()
+    ]);
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] onQueryImpl: context loaded, autoModeResult=${JSON.stringify(autoModeResult)}, about to build systemPrompt\n`); } catch {}
     const userContext = {
       ...baseUserContext,
       ...getCoordinatorUserContext(freshMcpClients, isScratchpadEnabled() ? getScratchpadDir() : undefined),
@@ -2803,8 +2836,10 @@ export function REPL({
       toolUseContext,
       querySource: getQuerySourceForREPL()
     })) {
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] onQueryImpl: query event ${event.type}\n`); } catch {}
       onQueryEvent(event);
     }
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] onQueryImpl: query finished\n`); } catch {}
     if (feature('BUDDY')) {
       void fireCompanionObserver(messagesRef.current, reaction => setAppState(prev => prev.companionReaction === reaction ? prev : {
         ...prev,
@@ -2857,6 +2892,7 @@ export function REPL({
     await onTurnComplete?.(messagesRef.current);
   }, [initialMcpClients, resetLoadingState, getToolUseContext, toolPermissionContext, setAppState, customSystemPrompt, onTurnComplete, appendSystemPrompt, canUseTool, mainThreadAgentDefinition, onQueryEvent, sessionTitle, titleDisabled]);
   const onQuery = useCallback(async (newMessages: MessageType[], abortController: AbortController, shouldQuery: boolean, additionalAllowedTools: string[], mainLoopModelParam: string, onBeforeQueryCallback?: (input: string, newMessages: MessageType[]) => Promise<boolean>, input?: string, effort?: EffortValue): Promise<void> => {
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] onQuery: shouldQuery=${shouldQuery}, msgs=${newMessages.length}\n`); } catch {}
     // If this is a teammate, mark them as active when starting a turn
     if (isAgentSwarmsEnabled()) {
       const teamName = getTeamName();
@@ -2920,6 +2956,7 @@ export function REPL({
         }
       }
       await onQueryImpl(latestMessages, newMessages, abortController, shouldQuery, additionalAllowedTools, mainLoopModelParam, effort);
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] onQuery: onQueryImpl returned\n`); } catch {}
     } finally {
       // queryGuard.end() atomically checks generation and transitions
       // running→idle. Returns false if a newer query owns the guard
@@ -3150,13 +3187,24 @@ export function REPL({
   }, options?: {
     fromKeybinding?: boolean;
   }) => {
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL.onSubmit: input="${input}", isLoading=${isLoading}, speculationAccept=${!!speculationAccept}\n`); } catch {}
     // Re-pin scroll to bottom on submit so the user always sees the new
     // exchange (matches OpenCode's auto-scroll behavior).
-    repinScroll();
+    try {
+      repinScroll();
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: repinScroll done\n`); } catch {}
+    } catch (e) {
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: repinScroll ERROR: ${e}\n`); } catch {}
+    }
 
     // Resume loop mode if paused
     if (feature('PROACTIVE') || feature('KAIROS')) {
-      proactiveModule?.resumeProactive();
+      try {
+        proactiveModule?.resumeProactive();
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: resumeProactive done\n`); } catch {}
+      } catch (e) {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: resumeProactive ERROR: ${e}\n`); } catch {}
+      }
     }
 
     // Handle immediate commands - these bypass the queue and execute right away
@@ -3281,12 +3329,14 @@ export function REPL({
           }
         };
         void executeImmediateCommand();
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: returning early after local-jsx immediate command\n`); } catch {}
         return; // Always return early - don't add to history or queue
       }
     }
 
     // Remote mode: skip empty input early before any state mutations
     if (activeRemote.isRemoteMode && !input.trim()) {
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: returning early for remote mode empty input\n`); } catch {}
       return;
     }
 
@@ -3308,6 +3358,7 @@ export function REPL({
           setInputValue('');
           helpers.setCursorOffset(0);
           helpers.clearBuffer();
+          try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: returning early for idle dialog\n`); } catch {}
           return;
         }
       }
@@ -3406,6 +3457,7 @@ export function REPL({
         setAbortController(newAbortController);
         void onQuery([], newAbortController, true, [], mainLoopModel);
       }
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: returning early after speculationAccept\n`); } catch {}
       return;
     }
 
@@ -3486,11 +3538,14 @@ export function REPL({
       await activeRemote.sendMessage(remoteContent, {
         uuid: userMessage.uuid
       });
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: returning early after remote mode send\n`); } catch {}
       return;
     }
 
     // Ensure SessionStart hook context is available before the first API call.
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: calling awaitPendingHooks\n`); } catch {}
     await awaitPendingHooks();
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] REPL: awaitPendingHooks done, about to call handlePromptSubmit\n`); } catch {}
     await handlePromptSubmit({
       input,
       helpers,
@@ -4511,6 +4566,7 @@ export function REPL({
   // When viewing an agent, never fall through to leader — empty until
   // bootstrap/stream fills. Closes the see-leader-type-agent footgun.
   const displayedMessages = viewedAgentTask ? viewedAgentTask.messages ?? [] : usesSyncMessages ? messages : deferredMessages;
+  try { fs.appendFileSync('enter-debug.log', `[ENTER] displayedMessages: usesSync=${usesSyncMessages}, msgs=${messages.length}, deferred=${deferredMessages.length}, displayed=${displayedMessages.length}, isLoading=${isLoading}\n`); } catch {}
   // Show the placeholder until the real user message appears in
   // displayedMessages. userInputOnProcessing stays set for the whole turn
   // (cleared in resetLoadingState); this length check hides it once

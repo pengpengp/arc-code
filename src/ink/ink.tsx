@@ -158,6 +158,12 @@ export default class Ink {
   // one full-render frame; steady-state frames after clear it and regain
   // the blit + narrow-damage fast path.
   private prevFrameContaminated = false;
+  // Snapshot of the previous frame's overlay state. Used to narrow
+  // prevFrameContaminated: only force full damage when the overlay
+  // actually changed (appeared, moved, cleared) instead of every
+  // frame the overlay is active. Reduces unnecessary full-redraws
+  // during steady-state streaming with active search/selection.
+  private prevOverlayState: { selActive: boolean; hlQuery: string; hlPositionsKey: string; hlCurrentIdx: number } | null = null;
   // Set by handleResize: prepend ERASE_SCREEN to the next onRender's patches
   // INSIDE the BSU/ESU block so clear+paint is atomic. Writing ERASE_SCREEN
   // synchronously in handleResize would leave the screen blank for the ~80ms
@@ -534,6 +540,7 @@ export default class Ink {
     // the frame-after-selection-clears case.
     let selActive = false;
     let hlActive = false;
+    let sp: { positions: any[]; rowOffset: number; currentIdx: number } | undefined
     if (this.altScreenActive) {
       selActive = hasSelection(this.selection);
       if (selActive) {
@@ -546,7 +553,7 @@ export default class Ink {
       // rowOffset. No scanning — positions came from a prior scan when
       // the message first mounted. Message-relative + rowOffset = screen.
       if (this.searchPositions) {
-        const sp = this.searchPositions;
+        sp = this.searchPositions;
         const posApplied = applyPositionedHighlight(frame.screen, this.stylePool, sp.positions, sp.rowOffset, sp.currentIdx);
         hlActive = hlActive || posApplied;
       }
@@ -557,7 +564,19 @@ export default class Ink {
     // cells at sibling boundaries that per-node damage tracking misses.
     // Selection/highlight overlays write via setCellStyleId which doesn't
     // track damage. prevFrameContaminated covers the cleanup frame.
-    if (didLayoutShift() || selActive || hlActive || this.prevFrameContaminated) {
+    //
+    // Overlay stability: selection and search highlights only need full
+    // damage when they *change* between frames (appear, move, clear).
+    // Steady-state frames with unchanged overlays skip full damage —
+    // the text content hasn't changed, so narrow damage is sufficient.
+    const currentHlPositionsKey = sp ? `${sp.rowOffset}:${sp.currentIdx}:${sp.positions.length}` : ''
+    const prevOverlay = this.prevOverlayState
+    const overlayChanged = prevOverlay === null
+      || prevOverlay.selActive !== selActive
+      || prevOverlay.hlQuery !== this.searchHighlightQuery
+      || prevOverlay.hlPositionsKey !== currentHlPositionsKey
+      || prevOverlay.hlCurrentIdx !== (sp?.currentIdx ?? -1)
+    if (didLayoutShift() || overlayChanged || this.prevFrameContaminated) {
       frame.screen.damage = {
         x: 0,
         y: 0,
@@ -741,6 +760,17 @@ export default class Ink {
     // becomes frontFrame (= next frame's prevScreen). If we applied the
     // selection overlay, that buffer has inverted cells. selActive/hlActive
     // are only ever true in alt-screen; in main-screen this is false→false.
+    //
+    // Also snapshot the overlay state so the NEXT frame can detect whether
+    // the overlay changed (requiring full damage) vs stayed steady (narrow
+    // damage suffices). This avoids per-frame full-redraw during streaming
+    // with an active search highlight or selection.
+    this.prevOverlayState = {
+      selActive,
+      hlQuery: this.searchHighlightQuery,
+      hlPositionsKey: currentHlPositionsKey,
+      hlCurrentIdx: sp?.currentIdx ?? -1,
+    }
     this.prevFrameContaminated = selActive || hlActive;
 
     // A ScrollBox has pendingScrollDelta left to drain — schedule the next

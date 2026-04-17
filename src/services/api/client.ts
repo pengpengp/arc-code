@@ -5,7 +5,7 @@ import {
   hasCchPlaceholder,
   replaceCchPlaceholder,
 } from 'src/utils/cch.js'
-import type { GoogleAuth } from 'google-auth-library'
+import type { GoogleAuth, AuthClient } from 'google-auth-library'
 import {
   checkAndRefreshOAuthTokenIfNeeded,
   getAnthropicApiKey,
@@ -33,9 +33,27 @@ import { isDebugToStdErr, logForDebugging } from '../../utils/debug.js'
 import {
   getAWSRegion,
   getVertexRegionForModel,
+  isEnvDefinedFalsy,
   isEnvTruthy,
 } from '../../utils/envUtils.js'
 import { createCodexFetch } from './codex-fetch-adapter.js'
+
+// --- GoogleAuth cache (Vertex AI) ---
+// GoogleAuth does expensive credential discovery on construction (filesystem +
+// metadata server probes). Cache the instance across API calls, invalidating
+// when the environment variables that affect auth change.
+let cachedGoogleAuth: GoogleAuth | { getClient: () => AuthClient } | null = null
+let cachedGoogleAuthEnvHash: string | null = null
+
+function computeGoogleAuthEnvHash(): string {
+  return [
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ?? '',
+    process.env.GCLOUD_PROJECT ?? '',
+    process.env.GOOGLE_CLOUD_PROJECT ?? '',
+    process.env.ANTHROPIC_VERTEX_PROJECT_ID ?? '',
+    process.env.CLAUDE_CODE_SKIP_VERTEX_AUTH ?? '',
+  ].join('|')
+}
 
 /**
  * Environment variables for different client types:
@@ -237,68 +255,47 @@ export async function getAnthropicClient({
       import('@anthropic-ai/vertex-sdk'),
       import('google-auth-library'),
     ])
-    // TODO: Cache either GoogleAuth instance or AuthClient to improve performance
-    // Currently we create a new GoogleAuth instance for every getAnthropicClient() call
-    // This could cause repeated authentication flows and metadata server checks
-    // However, caching needs careful handling of:
-    // - Credential refresh/expiration
-    // - Environment variable changes (GOOGLE_APPLICATION_CREDENTIALS, project vars)
-    // - Cross-request auth state management
-    // See: https://github.com/googleapis/google-auth-library-nodejs/issues/390 for caching challenges
 
-    // Prevent metadata server timeout by providing projectId as fallback
-    // google-auth-library checks project ID in this order:
-    // 1. Environment variables (GCLOUD_PROJECT, GOOGLE_CLOUD_PROJECT, etc.)
-    // 2. Credential files (service account JSON, ADC file)
-    // 3. gcloud config
-    // 4. GCE metadata server (causes 12s timeout outside GCP)
-    //
-    // We only set projectId if user hasn't configured other discovery methods
-    // to avoid interfering with their existing auth setup
+    const currentEnvHash = computeGoogleAuthEnvHash()
+    if (cachedGoogleAuth && cachedGoogleAuthEnvHash === currentEnvHash) {
+      // Reuse cached auth — skip repeated credential discovery
+    } else {
+      // Check project environment variables in same order as google-auth-library
+      // See: https://github.com/googleapis/google-auth-library-nodejs/blob/main/src/auth/googleauth.ts
+      const hasProjectEnvVar =
+        process.env['GCLOUD_PROJECT'] ||
+        process.env['GOOGLE_CLOUD_PROJECT'] ||
+        process.env['gcloud_project'] ||
+        process.env['google_cloud_project']
 
-    // Check project environment variables in same order as google-auth-library
-    // See: https://github.com/googleapis/google-auth-library-nodejs/blob/main/src/auth/googleauth.ts
-    const hasProjectEnvVar =
-      process.env['GCLOUD_PROJECT'] ||
-      process.env['GOOGLE_CLOUD_PROJECT'] ||
-      process.env['gcloud_project'] ||
-      process.env['google_cloud_project']
+      // Check for credential file paths (service account or ADC)
+      const hasKeyFile =
+        process.env['GOOGLE_APPLICATION_CREDENTIALS'] ||
+        process.env['google_application_credentials']
 
-    // Check for credential file paths (service account or ADC)
-    // Note: We're checking both standard and lowercase variants to be safe,
-    // though we should verify what google-auth-library actually checks
-    const hasKeyFile =
-      process.env['GOOGLE_APPLICATION_CREDENTIALS'] ||
-      process.env['google_application_credentials']
-
-    const googleAuth = isEnvTruthy(process.env.CLAUDE_CODE_SKIP_VERTEX_AUTH)
-      ? ({
-          // Mock GoogleAuth for testing/proxy scenarios
-          getClient: () => ({
-            getRequestHeaders: () => ({}),
-          }),
-        } as unknown as GoogleAuth)
-      : new GoogleAuth({
-          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-          // Only use ANTHROPIC_VERTEX_PROJECT_ID as last resort fallback
-          // This prevents the 12-second metadata server timeout when:
-          // - No project env vars are set AND
-          // - No credential keyfile is specified AND
-          // - ADC file exists but lacks project_id field
-          //
-          // Risk: If auth project != API target project, this could cause billing/audit issues
-          // Mitigation: Users can set GOOGLE_CLOUD_PROJECT to override
-          ...(hasProjectEnvVar || hasKeyFile
-            ? {}
-            : {
-                projectId: process.env.ANTHROPIC_VERTEX_PROJECT_ID,
-              }),
-        })
+      cachedGoogleAuth = isEnvTruthy(process.env.CLAUDE_CODE_SKIP_VERTEX_AUTH)
+        ? ({
+            // Mock GoogleAuth for testing/proxy scenarios
+            getClient: () => ({
+              getRequestHeaders: () => ({}),
+            }),
+          } as unknown as GoogleAuth)
+        : new GoogleAuth({
+            scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            // Only use ANTHROPIC_VERTEX_PROJECT_ID as last resort fallback
+            ...(hasProjectEnvVar || hasKeyFile
+              ? {}
+              : {
+                  projectId: process.env.ANTHROPIC_VERTEX_PROJECT_ID,
+                }),
+          })
+      cachedGoogleAuthEnvHash = currentEnvHash
+    }
 
     const vertexArgs: ConstructorParameters<typeof AnthropicVertex>[0] = {
       ...ARGS,
       region: getVertexRegionForModel(model),
-      googleAuth,
+      googleAuth: cachedGoogleAuth,
       ...(isDebugToStdErr() && { logger: createStderrLogger() }),
     }
     // we have always been lying about the return type - this doesn't support batching or models

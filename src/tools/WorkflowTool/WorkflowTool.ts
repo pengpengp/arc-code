@@ -31,6 +31,9 @@ export const WorkflowTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema,
+  async prompt() {
+    return 'Run automated workflow scripts for common tasks.'
+  },
 
   async call(args, context) {
     const { action, workflow_name, arguments: workflowArgs } = args as z.infer<ReturnType<typeof inputSchema>>

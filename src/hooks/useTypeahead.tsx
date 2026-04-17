@@ -1135,7 +1135,9 @@ export function useTypeahead({
 
   // Handle enter key press - apply and execute suggestions
   const handleEnter = useCallback(() => {
-    if (selectedSuggestion < 0 || suggestions.length === 0) return;
+    if (selectedSuggestion < 0 || suggestions.length === 0) {
+      return;
+    }
     const suggestion = suggestions[selectedSuggestion];
     if (suggestionType === 'command' && selectedSuggestion < suggestions.length) {
       if (suggestion) {

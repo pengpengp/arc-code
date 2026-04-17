@@ -10,6 +10,7 @@ import {
   switchSession,
 } from '../bootstrap/state.js'
 import { clearSystemPromptSections } from '../constants/systemPromptSections.js'
+import { invalidateSysPromptCache } from './queryContext.js'
 import { restoreCostStateForSession } from '../cost-tracker.js'
 import type { AppState } from '../state/AppState.js'
 import type { AgentColorName } from '../tools/AgentTool/agentColorManager.js'
@@ -362,6 +363,7 @@ export function restoreWorktreeForResume(
   // (caches aren't populated yet there).
   clearMemoryFileCaches()
   clearSystemPromptSections()
+  invalidateSysPromptCache()
   getPlansDirectory.cache.clear?.()
 }
 
@@ -386,6 +388,7 @@ export function exitRestoredWorktree(): void {
   // stale whether or not chdir succeeds below.
   clearMemoryFileCaches()
   clearSystemPromptSections()
+  invalidateSysPromptCache()
   getPlansDirectory.cache.clear?.()
 
   try {

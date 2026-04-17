@@ -4,7 +4,7 @@
  * multiple clients (CLI, IDE, web). Manages worker processes
  * for concurrent task execution.
  */
-import { spawn, fork } from 'child_process'
+import { spawn, fork, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -12,6 +12,12 @@ import { randomUUID } from 'crypto'
 import { createServer } from 'net'
 import { getClaudeConfigHomeDir } from '../utils/envUtils.js'
 import { logForDebugging } from '../utils/debug.js'
+import {
+  recordHeartbeat,
+  removeHeartbeat,
+  startHealthCheck,
+  HEALTH_CHECK_INTERVAL_MS,
+} from './workerHealth.js'
 
 const DAEMON_DIR = join(getClaudeConfigHomeDir(), 'daemon')
 const DAEMON_SOCKET = join(tmpdir(), 'claude-daemon.sock')
@@ -215,7 +221,54 @@ const MAX_RESTARTS_PER_WORKER = 5
  */
 const RESTART_DELAY_MS = 1000
 
+/** Map of worker ID to child process for PID lookups */
+const activeWorkers = new Map<string, ChildProcess>()
+
+/** Lazy-start health check loop — starts on first worker spawn */
+let healthCheckStopper: (() => void) | null = null
+
+function ensureHealthCheckRunning(): void {
+  if (healthCheckStopper) return
+  healthCheckStopper = startHealthCheck(
+    () => {
+      const pids = new Map<string, number | undefined>()
+      for (const [id, proc] of activeWorkers) {
+        pids.set(id, proc.pid)
+      }
+      return pids
+    },
+    (workerId, info) => {
+      // Worker unhealthy — check if process is dead and restart
+      const proc = activeWorkers.get(workerId)
+      if (proc && proc.pid) {
+        try {
+          process.kill(proc.pid, 0)
+        } catch {
+          // Process confirmed dead, trigger restart
+          logForDebugging(
+            `[daemon] Health check: worker ${workerId} dead, forcing restart`,
+          )
+          const workers = loadWorkers()
+          const w = workers.find(w => w.id === workerId)
+          const restartCount = w?.restartCount ?? 0
+          if (restartCount < MAX_RESTARTS_PER_WORKER) {
+            activeWorkers.delete(workerId)
+            removeHeartbeat(workerId)
+            unregisterWorker(workerId)
+            spawnWorker(w?.type ?? 'task').catch(err => {
+              logForDebugging(`[daemon] Health check restart failed: ${err.message}`)
+            })
+          }
+        }
+      }
+    },
+  )
+}
+
 async function spawnWorker(type: string, config: Record<string, unknown> = {}): Promise<string> {
+  // Start health check loop on first worker
+  ensureHealthCheckRunning()
+
   const id = `worker_${randomUUID().slice(0, 8)}`
   const daemonPath = join(process.cwd(), process.argv[1])
 
@@ -225,10 +278,22 @@ async function spawnWorker(type: string, config: Record<string, unknown> = {}): 
     env: { ...process.env, CLAUDE_WORKER_ID: id, CLAUDE_WORKER_TYPE: type },
   })
 
+  activeWorkers.set(id, child)
+  recordHeartbeat(id)
+
+  // Listen for heartbeat messages from workers
+  child.on('message', (msg: unknown) => {
+    if (msg && typeof msg === 'object' && (msg as { type?: string }).type === 'heartbeat') {
+      recordHeartbeat(id)
+    }
+  })
+
   // Register worker with restart count tracking
   registerWorker(id, type, child.pid, 0)
 
   child.on('exit', (code) => {
+    activeWorkers.delete(id)
+    removeHeartbeat(id)
     const workers = loadWorkers()
     const worker = workers.find(w => w.id === id)
     const restartCount = worker?.restartCount ?? 0

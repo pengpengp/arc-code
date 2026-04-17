@@ -20,6 +20,7 @@ import {
 import { createAbortController } from './abortController.js'
 import type { PastedContent } from './config.js'
 import { logForDebugging } from './debug.js'
+import * as fs from 'fs'
 import type { EffortValue } from './effort.js'
 import type { FileHistoryState } from './fileHistory.js'
 import { fileHistoryEnabled, fileHistoryMakeSnapshot } from './fileHistory.js'
@@ -120,6 +121,7 @@ export type HandlePromptSubmitParams = BaseExecutionParams & {
 export async function handlePromptSubmit(
   params: HandlePromptSubmitParams,
 ): Promise<void> {
+  try { fs.appendFileSync('enter-debug.log', `[ENTER] handlePromptSubmit: input="${(params.input ?? '').slice(0, 50)}"\n`); } catch {}
   const {
     helpers,
     queryGuard,
@@ -311,6 +313,7 @@ export async function handlePromptSubmit(
   }
 
   if (queryGuard.isActive || isExternalLoading) {
+    try { fs.appendFileSync('enter-debug.log', `[ENTER] handlePromptSubmit: queryGuard.isActive=${queryGuard.isActive}, isExternalLoading=${isExternalLoading}, will enqueue\n`); } catch {}
     // Only allow prompt and bash mode commands to be queued
     if (mode !== 'prompt' && mode !== 'bash') {
       return
@@ -352,6 +355,7 @@ export async function handlePromptSubmit(
 
   // Start query profiling for this query
   startQueryProfile()
+  try { fs.appendFileSync('enter-debug.log', `[ENTER] handlePromptSubmit: about to call executeUserInput\n`); } catch {}
 
   // Construct a QueuedCommand from the direct user input so both paths
   // go through the same executeUserInput loop. This ensures images get
@@ -394,6 +398,7 @@ export async function handlePromptSubmit(
  * get `skipAttachments` to avoid duplicating turn-level context.
  */
 async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
+  try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: starting\n`); } catch {}
   const {
     messages,
     mainLoopModel,
@@ -473,27 +478,35 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
       for (let i = 0; i < commands.length; i++) {
         const cmd = commands[i]!
         const isFirst = i === 0
-        const result = await processUserInput({
-          input: cmd.value,
-          preExpansionInput: cmd.preExpansionValue,
-          mode: cmd.mode,
-          setToolJSX,
-          context: makeContext(),
-          pastedContents: isFirst ? cmd.pastedContents : undefined,
-          messages,
-          setUserInputOnProcessing: isFirst
-            ? setUserInputOnProcessing
-            : undefined,
-          isAlreadyProcessing: !isFirst,
-          querySource,
-          canUseTool,
-          uuid: cmd.uuid,
-          ideSelection: isFirst ? ideSelection : undefined,
-          skipSlashCommands: cmd.skipSlashCommands,
-          bridgeOrigin: cmd.bridgeOrigin,
-          isMeta: cmd.isMeta,
-          skipAttachments: !isFirst,
-        })
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: about to call processUserInput for cmd="${(cmd.value as string).slice(0, 50)}"\n`); } catch {}
+        let result
+        try {
+          result = await processUserInput({
+            input: cmd.value,
+            preExpansionInput: cmd.preExpansionValue,
+            mode: cmd.mode,
+            setToolJSX,
+            context: makeContext(),
+            pastedContents: isFirst ? cmd.pastedContents : undefined,
+            messages,
+            setUserInputOnProcessing: isFirst
+              ? setUserInputOnProcessing
+              : undefined,
+            isAlreadyProcessing: !isFirst,
+            querySource,
+            canUseTool,
+            uuid: cmd.uuid,
+            ideSelection: isFirst ? ideSelection : undefined,
+            skipSlashCommands: cmd.skipSlashCommands,
+            bridgeOrigin: cmd.bridgeOrigin,
+            isMeta: cmd.isMeta,
+            skipAttachments: !isFirst,
+          })
+          try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: processUserInput returned successfully\n`); } catch {}
+        } catch (e) {
+          try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: processUserInput ERROR: ${e}\n`); } catch {}
+          throw e
+        }
         // Stamp origin here rather than threading another arg through
         // processUserInput → processUserInputBase → processTextPrompt → createUserMessage.
         // Derive origin from mode for task-notifications — mirrors the origin
@@ -521,8 +534,11 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
         }
       }
 
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: calling queryCheckpoint end\n`); } catch {}
       queryCheckpoint('query_process_user_input_end')
+      try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: queryCheckpoint done, checking fileHistory\n`); } catch {}
       if (fileHistoryEnabled()) {
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: fileHistory enabled, making snapshots\n`); } catch {}
         queryCheckpoint('query_file_history_snapshot_start')
         newMessages.filter(selectableUserMessagesFilter).forEach(message => {
           void fileHistoryMakeSnapshot(
@@ -543,7 +559,9 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
         // This ensures queued command processing (notifications, already-queued user input)
         // doesn't add to history, since those either shouldn't be in history or were
         // already added when originally queued.
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: about to resetHistory\n`); } catch {}
         resetHistory()
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: resetHistory done, about to setToolJSX\n`); } catch {}
         setToolJSX({
           jsx: null,
           shouldHidePromptInput: false,
@@ -557,6 +575,7 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
             ? primaryCmd.value
             : undefined
         const shouldCallBeforeQuery = primaryMode === 'prompt'
+        try { fs.appendFileSync('enter-debug.log', `[ENTER] executeUserInput: about to call onQuery, shouldQuery=${shouldQuery}, msgCount=${newMessages.length}\n`); } catch {}
         await onQuery(
           newMessages,
           abortController,

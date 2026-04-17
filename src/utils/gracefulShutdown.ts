@@ -211,6 +211,20 @@ function forceExit(exitCode: number): never {
   } catch {
     // Terminal may be gone (SIGHUP). Ignore — we are about to exit.
   }
+  // On Windows MSYS2/Cygwin (Git Bash), fs.writeSync writes to a pipe that
+  // the MSYS2 parent process reads from and translates to the real terminal.
+  // The async cleanup between cleanupTerminalModes() and here can cause the
+  // EXIT_ALT_SCREEN sequence to be buffered but not flushed to the real
+  // terminal before process.exit() kills the process. Re-sending it as the
+  // very last write ensures the terminal exits alt-screen even on MSYS2.
+  if (process.env.MSYSTEM) {
+    try {
+      writeSync(1, EXIT_ALT_SCREEN)
+      writeSync(1, SHOW_CURSOR)
+    } catch {
+      // Terminal may be gone. Ignore — we are about to exit.
+    }
+  }
   try {
     process.exit(exitCode)
   } catch (e) {

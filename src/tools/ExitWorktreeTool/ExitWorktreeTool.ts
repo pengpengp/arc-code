@@ -141,6 +141,7 @@ function restoreSessionToOriginalCwd(
   }
   saveWorktreeState(null)
   clearSystemPromptSections()
+  void import('../../utils/queryContext.js').then(m => m.invalidateSysPromptCache())
   clearMemoryFileCaches()
   getPlansDirectory.cache.clear?.()
 }

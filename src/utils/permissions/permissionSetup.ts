@@ -1001,9 +1001,9 @@ export async function initializeToolPermissionContext({
   // (two overlapping --add-dirs both succeed instead of one being flagged
   // alreadyInWorkingDirectory, which was silently skipped anyway).
   const validationResults = await Promise.all(
-    allAdditionalDirectories.map(dir =>
-      validateDirectoryForWorkspace(dir, toolPermissionContext),
-    ),
+    allAdditionalDirectories.map(dir => {
+      return validateDirectoryForWorkspace(dir, toolPermissionContext)
+    }),
   )
   for (const result of validationResults) {
     if (result.resultType === 'success') {
@@ -1065,30 +1065,30 @@ export function getAutoModeUnavailableNotification(
 }
 
 /**
- * Async check of auto mode availability.
+ * Synchronous check of auto mode availability.
  *
- * Returns a transform function (not a pre-computed context) that callers
- * apply inside setAppState(prev => ...) against the CURRENT context. This
- * prevents the async GrowthBook await from clobbering mid-turn mode changes
- * (e.g., user shift-tabs to acceptEdits while this check is in flight).
+ * Uses non-blocking cached GrowthBook reads to avoid blocking the query
+ * pipeline. Returns a transform function (not a pre-computed context) that
+ * callers apply inside setAppState(prev => ...) against the CURRENT context.
+ * This prevents mid-turn mode changes (e.g., user shift-tabs to acceptEdits)
+ * from being clobbered.
  *
  * The transform re-checks mode/prePlanMode against the fresh ctx to avoid
- * kicking the user out of a mode they've already left during the await.
+ * kicking the user out of a mode they've already left.
  */
-export async function verifyAutoModeGateAccess(
+export function verifyAutoModeGateAccess(
   currentContext: ToolPermissionContext,
   // Runtime AppState.fastMode — passed from callers with AppState access so
   // the disableFastMode circuit breaker reads current state, not stale
   // settings.fastMode (which is intentionally sticky across /model auto-
   // downgrades). Optional for callers without AppState (e.g. SDK init paths).
   fastMode?: boolean,
-): Promise<AutoModeGateCheckResult> {
+): AutoModeGateCheckResult {
   // Auto-mode config — runs in ALL builds (circuit breaker, carousel, kick-out)
-  // Fresh read of tengu_auto_mode_config.enabled — this async check runs once
-  // after GrowthBook initialization and is the authoritative source for
-  // isAutoModeAvailable. The sync startup path uses stale cache; this
-  // corrects it. Circuit breaker (enabled==='disabled') takes effect here.
-  const autoModeConfig = await getDynamicConfig_BLOCKS_ON_INIT<{
+  // Use non-blocking cached read to avoid blocking the query pipeline on
+  // GrowthBook initialization. Values may be stale from a previous process,
+  // but this is acceptable — the periodic refresh corrects them asynchronously.
+  const autoModeConfig = getFeatureValue_CACHED_MAY_BE_STALE<{
     enabled?: AutoModeEnabledState
     disableFastMode?: boolean
   }>('tengu_auto_mode_config', {})

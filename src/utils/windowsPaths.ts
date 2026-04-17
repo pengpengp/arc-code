@@ -12,9 +12,9 @@ import { getPlatform } from './platform.js'
  * @param path - The path to check
  * @returns true if the path exists, false otherwise
  */
-function checkPathExists(path: string): boolean {
+function checkPathExists(p: string): boolean {
   try {
-    execSync_DEPRECATED(`dir "${path}"`, { stdio: 'pipe' })
+    execSync_DEPRECATED(`dir "${p}"`, { stdio: 'pipe' })
     return true
   } catch {
     return false
@@ -96,6 +96,7 @@ export function setShellIfWindows(): void {
  * Find the path where `bash.exe` included with git-bash exists, exiting the process if not found.
  */
 export const findGitBashPath = memoize((): string => {
+  // 1. Explicit env var override
   if (process.env.CLAUDE_CODE_GIT_BASH_PATH) {
     if (checkPathExists(process.env.CLAUDE_CODE_GIT_BASH_PATH)) {
       return process.env.CLAUDE_CODE_GIT_BASH_PATH
@@ -108,17 +109,66 @@ export const findGitBashPath = memoize((): string => {
     process.exit(1)
   }
 
+  // 2. If already running inside bash, use the current bash binary
+  if (process.env.BASH) {
+    // BASH may be a POSIX path like /usr/bin/bash in MSYS2 environments.
+    // On Windows, fs.statSync can't resolve POSIX paths directly, so just
+    // trust the env var when it looks like a valid bash path.
+    if (process.env.BASH.endsWith('bash.exe') || process.env.BASH.endsWith('bash')) {
+      return process.env.BASH
+    }
+    if (checkPathExists(process.env.BASH)) {
+      return process.env.BASH
+    }
+  }
+
+  // 3. Search PATH for bash.exe
+  const pathEnv = process.env.PATH || ''
+  const pathDirs = pathWin32.delimiter === ';'
+    ? pathEnv.split(';').filter(Boolean)
+    : pathEnv.split(':').filter(Boolean)
+  for (const dir of pathDirs) {
+    const candidate = pathWin32.join(dir, 'bash.exe')
+    if (checkPathExists(candidate)) {
+      return candidate
+    }
+    // Also try converting from POSIX-style directory (MSYS2 PATH may
+    // contain /usr/bin style entries). On Windows, fs.statSync can't
+    // resolve POSIX paths, so convert to Windows path first.
+    if (dir.startsWith('/') && dir.length >= 3) {
+      // /c/... or /usr/bin style
+      const driveMatch = dir.match(/^\/([A-Za-z])\//)
+      if (driveMatch) {
+        const windowsDir = `${driveMatch[1]}:${dir.slice(2)}`
+          .replace(/\//g, '\\')
+        const winCandidate = pathWin32.join(windowsDir, 'bash.exe')
+        if (checkPathExists(winCandidate)) {
+          return winCandidate
+        }
+      }
+    }
+  }
+
+  // 4. Fallback: find git.exe via where.exe, derive bash path from it
   const gitPath = findExecutable('git')
   if (gitPath) {
-    const bashPath = pathWin32.join(gitPath, '..', '..', 'bin', 'bash.exe')
-    if (checkPathExists(bashPath)) {
-      return bashPath
+    // Git Bash installs bash at multiple possible locations relative to git.exe
+    const candidates = [
+      // Standard Git for Windows: C:\Program Files\Git\cmd\git.exe -> ..\..\bin\bash.exe
+      pathWin32.join(gitPath, '..', '..', 'bin', 'bash.exe'),
+      // MSYS2-based installs: C:\Program Files\Git\mingw64\bin\git.exe -> ..\..\usr\bin\bash.exe
+      pathWin32.join(gitPath, '..', '..', 'usr', 'bin', 'bash.exe'),
+    ]
+    for (const bashPath of candidates) {
+      if (checkPathExists(bashPath)) {
+        return bashPath
+      }
     }
   }
 
   // biome-ignore lint/suspicious/noConsole:: intentional console output
   console.error(
-    'Claude Code on Windows requires git-bash (https://git-scm.com/downloads/win). If installed but not in PATH, set environment variable pointing to your bash.exe, similar to: CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe',
+    'Claude Code on Windows requires git-bash (https://git-scm.com/downloads/win). If installed but not in PATH, set environment variable pointing to your bash.exe, similar to: CLAUDE_CODE_GIT_BASH_PATH=C:\\tools\\Git\\bin\\bash.exe',
   )
   // eslint-disable-next-line custom-rules/no-process-exit
   process.exit(1)

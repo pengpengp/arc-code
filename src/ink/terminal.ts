@@ -107,6 +107,13 @@ export function isSynchronizedOutputSupported(): boolean {
   // Windows Terminal
   if (process.env.WT_SESSION) return true
 
+  // Windows conhost (plain cmd.exe/PowerShell.exe console window).
+  // Windows 10 1809+ (build 17763+) supports DEC 2026 natively.
+  // Detected by: no TERM_PROGRAM, no WT_SESSION, running on win32.
+  // Skip only when we know the OS is too old (hard to detect reliably),
+  // so we optimistically enable on all Windows 10+ systems.
+  if (process.platform === 'win32' && !termProgram && !process.env.WT_SESSION && !process.env.TMUX) return true
+
   // VTE-based terminals (GNOME Terminal, Tilix, etc.) since VTE 0.68
   const vteVersion = process.env.VTE_VERSION
   if (vteVersion) {

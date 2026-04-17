@@ -97,6 +97,9 @@ export const WebBrowserTool = buildTool({
   isReadOnly: () => true,
   inputSchema,
   outputSchema,
+  async prompt() {
+    return 'Browse and interact with web pages, navigate and extract content.'
+  },
 
   async call(args, context) {
     const start = Date.now()

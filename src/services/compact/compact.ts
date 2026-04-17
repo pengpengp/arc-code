@@ -588,6 +588,37 @@ export async function compactConversation(
       postCompactFileAttachments.push(createAttachmentMessage(att))
     }
 
+    // Notify LSP servers to close files that were compacted out of context.
+    // Only files NOT re-attached get didClose; re-attached files stay open.
+    try {
+      // Lazy-require to avoid import cycle
+      const { getLspServerManager } = require('../../services/lsp/manager.js') as {
+        getLspServerManager: () => { closeFile: (f: string) => Promise<void> } | undefined
+      }
+      const lspManager = getLspServerManager?.()
+      if (lspManager) {
+        const reAttachedPaths = new Set(
+          postCompactFileAttachments
+            .map(a => a.source?.file)
+            .filter((s): s is string => !!s),
+        )
+        const closePromises: Promise<unknown>[] = []
+        for (const filePath of Object.keys(preCompactReadFileState)) {
+          if (!reAttachedPaths.has(filePath)) {
+            closePromises.push(lspManager.closeFile(filePath).catch(e => e))
+          }
+        }
+        if (closePromises.length > 0) {
+          void Promise.allSettled(closePromises)
+          logForDebugging(
+            `[compact] Sent didClose for ${closePromises.length} LSP files compacted out`,
+          )
+        }
+      }
+    } catch {
+      // LSP module not available or failed — silently skip
+    }
+
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'session_start',

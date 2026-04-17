@@ -21,6 +21,9 @@ export const TerminalCaptureTool = buildTool({
   isConcurrencySafe: () => true,
   inputSchema,
   outputSchema: lazySchema(() => z.object({ success: z.boolean(), content: z.string(), lines: z.number(), session: z.string().optional() })),
+  async prompt() {
+    return 'Capture terminal output and screen content for analysis.'
+  },
 
   async call(args, context) {
     const { action, lines = 50, session } = args as z.infer<ReturnType<typeof inputSchema>>

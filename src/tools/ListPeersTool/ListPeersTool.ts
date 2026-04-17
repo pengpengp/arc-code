@@ -10,14 +10,16 @@ import { readdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 
+import { z } from 'zod/v4';
+import { lazySchema } from '../../utils/lazySchema.js';
+
+const inputSchema = lazySchema(() => z.object({}).passthrough());
+
 export const ListPeersTool = {
   name: 'ListPeers',
   description: 'List other Claude Code sessions on this machine',
-  parameters: {
-    type: 'object' as const,
-    properties: {},
-    required: [] as string[],
-  },
+  get inputSchema() { return inputSchema(); },
+  prompt: async () => 'List other Claude Code sessions on this machine',
   execute: async (): Promise<string> => {
     const socksDir = process.env.CLAUDE_CODE_SOCKS_DIR || join(homedir(), '.claude', 'socks')
     if (!existsSync(socksDir)) {

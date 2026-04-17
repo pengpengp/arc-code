@@ -97,6 +97,7 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
     saveWorktreeState(worktreeSession)
     // Clear cached system prompt sections so env_info_simple recomputes with worktree context
     clearSystemPromptSections()
+    void import('../../utils/queryContext.js').then(m => m.invalidateSysPromptCache())
     // Clear memoized caches that depend on CWD
     clearMemoryFileCaches()
     getPlansDirectory.cache.clear?.()

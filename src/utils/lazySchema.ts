@@ -4,5 +4,15 @@
  */
 export function lazySchema<T>(factory: () => T): () => T {
   let cached: T | undefined
-  return () => (cached ??= factory())
+  return () => {
+    if (cached === undefined) {
+      try {
+        cached = factory()
+      } catch (e) {
+        console.error('[lazySchema] factory error:', e)
+        throw e
+      }
+    }
+    return cached
+  }
 }
