@@ -1,6 +1,5 @@
 import { feature } from 'bun:bundle'
 import { useEffect, useRef } from 'react'
-import * as fs from 'fs'
 import {
   type AppState,
   useAppState,
@@ -21,23 +20,18 @@ export async function checkAndDisableBypassPermissionsIfNeeded(
   toolPermissionContext: ToolPermissionContext,
   setAppState: (f: (prev: AppState) => AppState) => void,
 ): Promise<void> {
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] bypassPermissions: checkAndDisableBypassPermissionsIfNeeded START\n`); } catch {}
   // Check if bypassPermissions should be disabled based on Statsig gate
   // Do this only once, before the first query, to ensure we have the latest gate value
   if (bypassPermissionsCheckRan) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] bypassPermissions: early return (already ran)\n`); } catch {}
     return
   }
   bypassPermissionsCheckRan = true
 
   if (!toolPermissionContext.isBypassPermissionsModeAvailable) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] bypassPermissions: not available, skipping\n`); } catch {}
     return
   }
 
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] bypassPermissions: about to call shouldDisableBypassPermissions\n`); } catch {}
   const shouldDisable = await shouldDisableBypassPermissions()
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] bypassPermissions: shouldDisable=${shouldDisable}\n`); } catch {}
   if (!shouldDisable) {
     return
   }

@@ -1,5 +1,4 @@
 import { GrowthBook } from '@growthbook/growthbook'
-import * as fs from 'fs'
 import { isEqual, memoize } from 'lodash-es'
 import {
   getIsNonInteractiveSession,
@@ -852,28 +851,23 @@ export function checkStatsigFeatureGate_CACHED_MAY_BE_STALE(
 export async function checkSecurityRestrictionGate(
   gate: string,
 ): Promise<boolean> {
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: gate=${gate}\n`); } catch {}
   // Check env var overrides first (for eval harnesses)
   const overrides = getEnvOverrides()
   if (overrides && gate in overrides) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: env override\n`); } catch {}
     return Boolean(overrides[gate])
   }
   const configOverrides = getConfigOverrides()
   if (configOverrides && gate in configOverrides) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: config override\n`); } catch {}
     return Boolean(configOverrides[gate])
   }
 
   if (!isGrowthBookEnabled()) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: GrowthBook disabled, returning false\n`); } catch {}
     return false
   }
 
   // If re-initialization is in progress, wait for it to complete
   // This ensures we get fresh values after auth changes
   if (reinitializingPromise) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: waiting for reinitializingPromise\n`); } catch {}
     await reinitializingPromise
   }
 
@@ -881,19 +875,16 @@ export async function checkSecurityRestrictionGate(
   const config = getGlobalConfig()
   const statsigCached = config.cachedStatsigGates?.[gate]
   if (statsigCached !== undefined) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: Statsig cache hit=${statsigCached}\n`); } catch {}
     return Boolean(statsigCached)
   }
 
   // Then check GrowthBook cache
   const gbCached = config.cachedGrowthBookFeatures?.[gate]
   if (gbCached !== undefined) {
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: GB cache hit=${gbCached}\n`); } catch {}
     return Boolean(gbCached)
   }
 
   // No cache - return false (don't block on init for uncached gates)
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] checkSecurityRestrictionGate: no cache, returning false\n`); } catch {}
   return false
 }
 

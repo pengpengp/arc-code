@@ -1,6 +1,5 @@
 import { feature } from 'bun:bundle'
-import * as fs from 'fs'
-import type { BetaUsage as Usage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import * as fs from 'fs'import type { BetaUsage as Usage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import type {
   ContentBlock,
   ContentBlockParam,
@@ -2948,7 +2947,6 @@ export function handleMessageFromStream(
   onApiMetrics?: (metrics: { ttftMs: number }) => void,
   onStreamingText?: (f: (current: string | null) => string | null) => void,
 ): void {
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] handleMessageFromStream: type=${message.type}\n`); } catch {}
   if (
     message.type !== 'stream_event' &&
     message.type !== 'stream_request_start'

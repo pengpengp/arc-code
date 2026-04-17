@@ -1,6 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
-import * as fs from 'fs';
 import chalk from 'chalk';
 import type { UUID } from 'crypto';
 import type { RefObject } from 'react';
@@ -523,7 +522,6 @@ const MessagesImpl = ({
     const afterTeammate = collapseTeammateShutdowns(collapseReadSearchGroups(groupedMessages, tools)).length;
     const afterHooks = collapseHookSummaries(collapseTeammateShutdowns(collapseReadSearchGroups(groupedMessages, tools))).length;
     const collapsed = collapseBackgroundBashNotifications(collapseHookSummaries(collapseTeammateShutdowns(collapseReadSearchGroups(groupedMessages, tools))), verbose);
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] Messages pipeline: normalized=${normalizedMessages.length} → compact=${compactAwareMessages.length} → noProgress=${messagesToShowNotTruncated.length} → brief=${briefFiltered.length} → show=${messagesToShow.length} → grouped=${afterGroup} → readSearch=${afterReadSearch} → teammate=${afterTeammate} → hooks=${afterHooks} → collapsed=${collapsed.length}\n`); } catch {}
     const lookups = buildMessageLookups(normalizedMessages, messagesToShow);
     const hiddenMessageCount = messagesToShowNotTruncated.length - MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE;
     return {
@@ -533,7 +531,6 @@ const MessagesImpl = ({
       hiddenMessageCount
     };
   }, [verbose, normalizedMessages, isTranscriptMode, syntheticStreamingToolUseMessages, shouldTruncate, tools, isBriefOnly]);
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] Messages component rendered: normalizedMessages=${normalizedMessages.length}, collapsed=${collapsed_0.length}, briefTool=${JSON.stringify([BRIEF_TOOL_NAME, SEND_USER_FILE_TOOL_NAME])}, isBriefOnly=${isBriefOnly}\n`); } catch {}
 
   // Cheap slice — only runs when scroll range or slice config changes.
   const renderableMessages = useMemo(() => {
@@ -548,7 +545,6 @@ const MessagesImpl = ({
     const sliceStart = capApplies ? computeSliceStart(collapsed_0, sliceAnchorRef) : 0;
     return renderRange ? collapsed_0.slice(renderRange[0], renderRange[1]) : sliceStart > 0 ? collapsed_0.slice(sliceStart) : collapsed_0;
   }, [collapsed_0, renderRange, virtualScrollRuntimeGate, disableRenderCap]);
-  try { fs.appendFileSync('enter-debug.log', `[ENTER] Messages: renderable=${renderableMessages.length}\n`); } catch {}
   const streamingToolUseIDs = useMemo(() => new Set(streamingToolUses.map(__0 => __0.contentBlock.id)), [streamingToolUses]);
 
   // Divider insertion point: first renderableMessage whose uuid shares the

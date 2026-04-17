@@ -1,6 +1,5 @@
 import { feature } from 'bun:bundle';
 import chalk from 'chalk';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -1075,14 +1074,11 @@ function PromptInput({
     // stale data (e.g., KAIROS mode initial state) and should not block submission.
     const validSuggestions = suggestionsState.suggestions.filter(s => s.type)
     const _debugMsg = `[ENTER] onSubmit: total=${suggestionsState.suggestions.length}, valid=${validSuggestions.length}, types=[${suggestionsState.suggestions.map(s => s.type).join(',')}], isSubmitting=${isSubmittingSlashCommand}`;
-    try { fs.appendFileSync('enter-debug.log', _debugMsg + '\n'); } catch {}
     const hasDirectorySuggestions = validSuggestions.length > 0 && validSuggestions.every(s => s.description === 'directory');
     if (validSuggestions.length > 0 && !isSubmittingSlashCommand && !hasDirectorySuggestions) {
-      try { fs.appendFileSync('enter-debug.log', `[ENTER] BLOCKED by suggestions guard\n`); } catch {}
       logForDebugging(`[onSubmit] early return: suggestions showing (count=${suggestionsState.suggestions.length})`);
       return; // Don't submit, user needs to clear suggestions first
     }
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] passing guard\n`); } catch {}
 
     // Log suggestion outcome if one exists
     if (promptSuggestionState.text && promptSuggestionState.shownAt > 0) {
@@ -1105,7 +1101,6 @@ function PromptInput({
     }
 
     // Normal leader submission
-    try { fs.appendFileSync('enter-debug.log', `[ENTER] calling onSubmitProp, input="${inputParam}"\n`); } catch {}
     await onSubmitProp(inputParam, {
       setCursorOffset,
       clearBuffer,
