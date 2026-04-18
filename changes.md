@@ -22,3 +22,26 @@ This pull request introduces full feature parity and explicit UI support for the
 
 ### 4. Git Housekeeping
 - Configured `.gitignore` to securely and durably exclude the `openclaw/` gateway directory from staging commits.
+
+---
+
+# Fix: dev-full Build No Response + Windows Hook + Tool Crash
+
+## Summary
+Three fixes applied to restore dev-full build text visibility, Windows hook compatibility, and tool rendering stability.
+
+## Fixes
+
+### 1. Brief Mode Auto-Enable Removed (`src/main.tsx:~2910`)
+**Problem**: In `dev-full` builds, sending any message resulted in no visible assistant response — the query completed successfully but all text was hidden in the UI.
+**Root cause**: The `defaultView:'chat'` settings path auto-enabled `setUserMsgOptIn(true)` for every local REPL session when KAIROS activated. With `isBriefOnly=true`, `filterForBriefTool` in `Messages.tsx:112-158` returned `false` for all assistant text messages, leaving only tool_use blocks visible.
+**Fix**: Removed the `defaultView` block that called `setUserMsgOptIn(true)`. Brief mode now requires explicit opt-in via `--tools Brief`, `--brief` flag, `CLAUDE_CODE_BRIEF` env var, or remote/assistant session.
+
+### 2. userFacingName Type Guard (`src/components/messages/UserToolResultMessage/UserToolSuccessMessage.tsx:84`)
+**Problem**: Runtime crash `TypeError: q6.userFacingName is not a function` when rendering tool success messages.
+**Root cause**: Deserialized tool stubs from remote/transcript sources may lack the `userFacingName` method, and the code called it unconditionally.
+**Fix**: Added `typeof tool.userFacingName === 'function'` guard before calling it.
+
+### 3. Windows jq → Python Hook Fix (`~/.claude/plugins/.../compound-engineering/hooks/inject-skills.sh`)
+**Problem**: `jq: command not found` error on Windows where Git Bash lacks `jq` binary.
+**Fix**: Replaced all `jq -r` calls with `python3 -c "import sys,json; ..."` equivalents. Python 3.11 is available on the system and produces identical output.

@@ -81,7 +81,7 @@ export function UserToolSuccessMessage({
   // render like plain assistant text. Skip the tool-result width constraint
   // so MarkdownTable's SAFETY_MARGIN=4 (tuned for the assistant-text 2-col
   // dot gutter) holds — otherwise tables wrap their box-drawing chars.
-  const rendersAsAssistantText = tool.userFacingName(undefined) === '';
+  const rendersAsAssistantText = typeof tool.userFacingName === 'function' && tool.userFacingName(undefined) === '';
   return <Box flexDirection="column">
       <Box flexDirection="column" width={rendersAsAssistantText ? undefined : width}>
         {renderedMessage}
