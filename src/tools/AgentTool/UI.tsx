@@ -849,7 +849,7 @@ export function extractLastToolInfo(progressMessages: ProgressMessage<Progress>[
         const parsedInput = tool.inputSchema.safeParse(input);
 
         // Get user-facing tool name
-        const userFacingToolName = tool.userFacingName(parsedInput.success ? parsedInput.data : undefined);
+        const userFacingToolName = typeof tool.userFacingName === 'function' ? tool.userFacingName(parsedInput.success ? parsedInput.data : undefined) : tool.name;
 
         // Try to get summary from the tool itself
         if (tool.getToolUseSummary) {

@@ -37,10 +37,16 @@ Three fixes applied to restore dev-full build text visibility, Windows hook comp
 **Root cause**: The `defaultView:'chat'` settings path auto-enabled `setUserMsgOptIn(true)` for every local REPL session when KAIROS activated. With `isBriefOnly=true`, `filterForBriefTool` in `Messages.tsx:112-158` returned `false` for all assistant text messages, leaving only tool_use blocks visible.
 **Fix**: Removed the `defaultView` block that called `setUserMsgOptIn(true)`. Brief mode now requires explicit opt-in via `--tools Brief`, `--brief` flag, `CLAUDE_CODE_BRIEF` env var, or remote/assistant session.
 
-### 2. userFacingName Type Guard (`src/components/messages/UserToolResultMessage/UserToolSuccessMessage.tsx:84`)
-**Problem**: Runtime crash `TypeError: q6.userFacingName is not a function` when rendering tool success messages.
-**Root cause**: Deserialized tool stubs from remote/transcript sources may lack the `userFacingName` method, and the code called it unconditionally.
-**Fix**: Added `typeof tool.userFacingName === 'function'` guard before calling it.
+### 2. userFacingName Type Guard (6 call sites)
+**Problem**: Runtime crash `TypeError: q6.userFacingName is not a function` when rendering tool messages after long-running sessions.
+**Root cause**: Deserialized tool stubs from remote/transcript sources may lack the `userFacingName` method, and 6 call sites called it unconditionally.
+**Fix**: Added `typeof tool.userFacingName === 'function'` guards at all 6 call sites:
+- `src/components/messages/AssistantToolUseMessage.tsx:77`
+- `src/components/messages/CollapsedReadSearchContent.tsx:99`
+- `src/components/messages/UserToolResultMessage/UserToolSuccessMessage.tsx:84` (already had guard)
+- `src/components/tasks/renderToolActivity.tsx:15`
+- `src/hooks/useCanUseTool.tsx:87`
+- `src/tools/AgentTool/UI.tsx:852`
 
 ### 3. Windows jq → Python Hook Fix (`~/.claude/plugins/.../compound-engineering/hooks/inject-skills.sh`)
 **Problem**: `jq: command not found` error on Windows where Git Bash lacks `jq` binary.

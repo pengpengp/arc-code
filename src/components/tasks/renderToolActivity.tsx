@@ -12,7 +12,7 @@ export function renderToolActivity(activity: ToolActivity, tools: Tools, theme: 
   try {
     const parsed = tool.inputSchema.safeParse(activity.input);
     const parsedInput = parsed.success ? parsed.data : {};
-    const userFacingName = tool.userFacingName(parsedInput);
+    const userFacingName = typeof tool.userFacingName === 'function' ? tool.userFacingName(parsedInput) : tool.name;
     if (!userFacingName) {
       return activity.toolName;
     }

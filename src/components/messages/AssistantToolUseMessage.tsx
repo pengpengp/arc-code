@@ -74,7 +74,7 @@ export function AssistantToolUseMessage(t0) {
       t1 = {
         tool,
         input,
-        userFacingToolName: tool.userFacingName(data),
+        userFacingToolName: typeof tool.userFacingName === 'function' ? tool.userFacingName(data) : tool.name,
         userFacingToolNameBackgroundColor: tool.userFacingNameBackgroundColor?.(data),
         isTransparentWrapper: tool.isTransparentWrapper?.() ?? false
       };

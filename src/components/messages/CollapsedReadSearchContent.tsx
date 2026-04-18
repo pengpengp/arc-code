@@ -96,7 +96,7 @@ function VerboseToolUse(t0) {
       const toolResult = parsedOutput?.success ? parsedOutput.data : undefined;
       const parsedInput = tool.inputSchema.safeParse(content.input);
       const input = parsedInput.success ? parsedInput.data : undefined;
-      const userFacingName = tool.userFacingName(input);
+      const userFacingName = typeof tool.userFacingName === 'function' ? tool.userFacingName(input) : tool.name;
       const toolUseMessage = input ? tool.renderToolUseMessage(input, {
         theme,
         verbose: true
