@@ -163,7 +163,7 @@ export function scanPositions(screen: Screen, query: string): MatchPosition[] {
     // maps indexOf positions (code units in the LOWERCASED text) to cell
     // indices in colOf — surrogate pairs (emoji) and multi-unit lowercase
     // (Turkish İ → i + U+0307) make text.length > colOf.length.
-    let text = ''
+    let textParts: string[] = []
     const colOf: number[] = []
     const codeUnitToCell: number[] = []
     for (let col = 0; col < w; col++) {
@@ -181,9 +181,11 @@ export function scanPositions(screen: Screen, query: string): MatchPosition[] {
       for (let i = 0; i < lc.length; i++) {
         codeUnitToCell.push(cellIdx)
       }
-      text += lc
+      textParts.push(lc)
       colOf.push(col)
     }
+    const text = textParts.join('')
+    textParts = []
     // Non-overlapping — same advance as applySearchHighlight.
     let pos = text.indexOf(lq)
     while (pos >= 0) {

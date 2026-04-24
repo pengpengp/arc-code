@@ -156,10 +156,12 @@ Feature flags are set at compile time via `bun:bundle` — dead code elimination
 
 | Command | Output | Features |
 |---|---|---|
-| `bun run build` | `./cli` | VOICE_MODE only |
-| `bun run build:dev` | `./cli-dev` | VOICE_MODE only |
-| `bun run build:dev:full` | `./cli-dev` | All 54 experimental flags |
-| `bun run compile` | `./dist/cli` | VOICE_MODE only |
+| `bun run build` | `./cli` | **All 38 experimental flags** (default) |
+| `bun run build:dev` | `./cli-dev` | All 38 experimental flags + dev version |
+| `bun run build:dev:full` | `./cli-dev` | All 38 experimental flags + dev version |
+| `bun run compile` | `./dist/cli` | All 38 experimental flags |
+
+> **Note**: Since v2.1.87+, `bun run build` now enables all 38 experimental feature flags by default. There is no longer a "VOICE_MODE only" production build — all builds are full-featured.
 
 Custom flags:
 
@@ -216,7 +218,7 @@ bun run dev
 
 ## Experimental Features
 
-88 feature flags total, 54 working and enabled in `build:dev:full`:
+88 feature flags total, 38 working flags enabled by default in all builds:
 
 ### Interaction & UI
 
@@ -276,7 +278,7 @@ bun run dev
 | `VOICE_MODE` | Voice input support |
 | `AWAY_SUMMARY` | Away mode summary |
 
-See [FEATURES.md](FEATURES.md) for the complete audit of all 88 flags.
+See [FEATURES.md](./FEATURES.md) for the complete audit of all 88 flags.
 
 ---
 
@@ -285,6 +287,16 @@ See [FEATURES.md](FEATURES.md) for the complete audit of all 88 flags.
 ```
 src/
   entrypoints/cli.tsx     # CLI entry + bootstrap
+  entrypoints/sdk/        # Agent SDK (15 public APIs)
+    agentSdkImpl.ts       # SDK function implementations
+    sdkSessionContext.ts   # Session management (Query/SDKSession)
+    runtimeTypes.ts       # Runtime type definitions
+    coreTypes.ts          # Core message types (29 SDKMessage variants)
+    coreTypes.generated.ts # Generated types (HookEvent, PermissionMode)
+    controlTypes.ts       # Control protocol types
+    settingsTypes.generated.ts # Settings schema types
+    sdkUtilityTypes.ts    # Utility types (token usage)
+    toolTypes.ts          # Tool-related SDK types
   main.tsx                # Main app initialization
   commands.ts             # Slash command registry
   tools.ts                # Agent tool registry
@@ -321,6 +333,57 @@ src/
 - **GrowthBook bypass**: Non-ant builds bypass remote feature gates locally, allowing all experimental features to activate.
 - **KAIROS state latch**: `setKairosActive(true)` must be called at startup for KAIROS subsystem to activate — handled in `main.tsx`.
 - **100% TypeScript**: Zero `.js` files in source. All migrated during quality improvement pass.
+
+### Agent SDK
+
+Full programmatic access to Claude Code via the Agent SDK. All 15 public APIs are implemented:
+
+```typescript
+import { query, unstable_v2_createSession, unstable_v2_prompt } from './entrypoints/agentSdkTypes.js'
+
+// One-shot query
+const q = query({ prompt: 'Explain this codebase', options: { model: 'claude-sonnet-4-6' } })
+for await (const msg of q) {
+  console.log(msg.type, msg)
+}
+console.log('Session ID:', q.sessionId)
+
+// Multi-turn session
+const session = await unstable_v2_createSession({ permissionMode: 'bypassPermissions' })
+await session.send('Hello, Claude!')
+for await (const msg of session.stream()) {
+  console.log(msg.type)
+}
+await session.close()
+
+// Simple prompt (returns final result)
+const result = await unstable_v2_prompt('What is 2+2?', { model: 'claude-sonnet-4-6' })
+console.log(result.result)
+```
+
+**SDK API Reference** (15 functions):
+
+| Function | Description |
+|---|---|
+| `query({ prompt, options })` | Streaming query, returns `Query` (AsyncIterable) |
+| `unstable_v2_createSession(options)` | Create new multi-turn session |
+| `unstable_v2_resumeSession(sessionId, options)` | Resume existing session |
+| `unstable_v2_prompt(message, options)` | One-shot prompt, returns `SDKResultMessage` |
+| `tool(name, description, schema, handler)` | Define MCP tool |
+| `createSdkMcpServer(options)` | Create MCP server instance |
+| `listSessions(options?)` | List saved sessions |
+| `getSessionInfo(sessionId, options?)` | Get session metadata |
+| `getSessionMessages(sessionId, options?)` | Get session messages |
+| `renameSession(sessionId, title, options?)` | Rename a session |
+| `tagSession(sessionId, tag, options?)` | Tag a session |
+| `forkSession(sessionId, options?)` | Fork a session |
+| `watchScheduledTasks(opts)` | Watch cron-scheduled tasks |
+| `buildMissedTaskNotification(tasks)` | Build notification for missed tasks |
+| `connectRemoteControl(opts)` | Connect to claude.ai remote control |
+
+**SDKSession methods**: `send()`, `stream()`, `close()`, `interrupt()`, `setModel()`, `setPermissionMode()`, `getMessages()`, `addMcpServer()`, `removeMcpServer()`
+
+**SDKSessionOptions** (22 fields): `model`, `systemPrompt`, `appendSystemPrompt`, `maxTurns`, `maxBudgetUsd`, `cwd`, `verbose`, `thinkingConfig`, `permissionMode`, `effort`, `abortController`, `env`, `hooks`, `agents`, `jsonSchema`, `fallbackModel`, `includePartialMessages`, `replayUserMessages`, `mcpConfigs`, `permissionToolName`, `excludeDynamicSections`, `agentProgressSummaries`, `promptSuggestions`, `sdkMcpServers`
 
 ---
 

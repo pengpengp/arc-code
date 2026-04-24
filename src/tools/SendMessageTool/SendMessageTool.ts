@@ -385,7 +385,11 @@ async function handleShutdownApproval(
     }
 
     setImmediate(async () => {
-      await gracefulShutdown(0, 'other')
+      try {
+        await gracefulShutdown(0, 'other')
+      } catch (e) {
+        logForDebugging(`SendMessageTool: gracefulShutdown failed: ${e}`)
+      }
     })
   }
 

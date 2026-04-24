@@ -172,11 +172,13 @@ function execRemote(conn, command) {
   return new Promise((resolve, reject) => {
     conn.exec(command, (err, stream) => {
       if (err) return reject(err)
-      let stdout = ''
-      let stderr = ''
-      stream.on('data', (data) => { stdout += data.toString() })
-      stream.stderr.on('data', (data) => { stderr += data.toString() })
+      let stdoutChunks: string[] = []
+      let stderrChunks: string[] = []
+      stream.on('data', (data) => { stdoutChunks.push(data.toString()) })
+      stream.stderr.on('data', (data) => { stderrChunks.push(data.toString()) })
       stream.on('close', (code) => {
+        const stdout = stdoutChunks.join('')
+        const stderr = stderrChunks.join('')
         if (code !== 0) return reject(new Error(`Command failed (${code}): ${stderr}`))
         resolve(stdout)
       })

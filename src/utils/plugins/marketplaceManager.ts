@@ -37,6 +37,7 @@ import { execFileNoThrow, execFileNoThrowWithCwd } from '../execFileNoThrow.js'
 import { getFsImplementation } from '../fsOperations.js'
 import { gitExe } from '../git.js'
 import { logError } from '../log.js'
+import { formatZodIssues } from '../zodErrors.js'
 import {
   getInitialSettings,
   getSettingsForSource,
@@ -273,7 +274,7 @@ export async function loadKnownMarketplacesConfig(): Promise<KnownMarketplacesCo
     // Validate against schema
     const parsed = KnownMarketplacesFileSchema().safeParse(data)
     if (!parsed.success) {
-      const errorMsg = `Marketplace configuration file is corrupted: ${parsed.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+      const errorMsg = `Marketplace configuration file is corrupted: ${formatZodIssues(parsed.error)}`
       logForDebugging(errorMsg, {
         level: 'error',
       })
@@ -1325,7 +1326,7 @@ async function cacheMarketplaceFromUrl(
       'invalid_schema',
     )
     throw new ConfigParseError(
-      `Invalid marketplace schema from URL: ${result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+      `Invalid marketplace schema from URL: ${formatZodIssues(result.error)}`,
       redactedUrl,
       response.data,
     )
@@ -1396,7 +1397,7 @@ async function parseFileWithSchema<T>(
   const result = schema.safeParse(data)
   if (!result.success) {
     throw new ConfigParseError(
-      `Invalid schema: ${filePath} ${result.error?.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+      `Invalid schema: ${filePath} ${result.error ? formatZodIssues(result.error) : 'unknown error'}`,
       filePath,
       data,
     )

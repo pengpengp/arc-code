@@ -370,7 +370,7 @@ export function gracefulShutdownSync(
     })
     // Prevent unhandled rejection: forceExit re-throws in test mode,
     // which would escape the .catch() handler above as a new rejection.
-    .catch(() => {})
+    .catch(e => logForDebugging(`[shutdown] forceExit re-threw: ${e}`))
 }
 
 let shutdownInProgress = false

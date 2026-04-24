@@ -19,6 +19,7 @@ import { getErrnoCode } from '../../utils/errors.js'
 import { getFsImplementation } from '../../utils/fsOperations.js'
 import { safeParseJSON } from '../../utils/json.js'
 import { logError } from '../../utils/log.js'
+import { formatZodIssues } from '../../utils/zodErrors.js'
 import { getPluginMcpServers } from '../../utils/plugins/mcpPluginIntegration.js'
 import { loadAllPluginsCacheOnly } from '../../utils/plugins/pluginLoader.js'
 import { isSettingSourceEnabled } from '../../utils/settings/constants.js'
@@ -657,9 +658,7 @@ export async function addMcpConfig(
   // Validate config first (needed for command-based policy checks)
   const result = McpServerConfigSchema().safeParse(config)
   if (!result.success) {
-    const formattedErrors = result.error.issues
-      .map(err => `${err.path.join('.')}: ${err.message}`)
-      .join(', ')
+    const formattedErrors = formatZodIssues(result.error)
     throw new Error(`Invalid configuration: ${formattedErrors}`)
   }
   const validatedConfig = result.data

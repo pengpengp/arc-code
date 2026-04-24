@@ -16,10 +16,15 @@ interface BrowserSession {
   historyIndex: number
 }
 
+const MAX_SESSIONS = 10
 const sessions = new Map<string, BrowserSession>()
 let sessionIdCounter = 0
 
 function createSession(): string {
+  if (sessions.size >= MAX_SESSIONS) {
+    const oldestKey = sessions.keys().next().value
+    if (oldestKey !== undefined) sessions.delete(oldestKey)
+  }
   const id = 'browser_' + (++sessionIdCounter)
   sessions.set(id, { url: '', content: '', title: '', links: [], history: [], historyIndex: -1 })
   return id

@@ -150,12 +150,12 @@ async function executeDreamTask(task: DreamTask): Promise<{ output: string; exit
       timeout: timeoutMs,
     })
 
-    let output = ''
-    child.stdout?.on('data', (chunk: Buffer) => { output += chunk.toString() })
-    child.stderr?.on('data', (chunk: Buffer) => { output += chunk.toString() })
+    let outputChunks: string[] = []
+    child.stdout?.on('data', (chunk: Buffer) => { outputChunks.push(chunk.toString()) })
+    child.stderr?.on('data', (chunk: Buffer) => { outputChunks.push(chunk.toString()) })
 
     child.on('close', (code: number) => {
-      resolve({ output, exitCode: code ?? 1 })
+      resolve({ output: outputChunks.join(''), exitCode: code ?? 1 })
     })
 
     child.on('error', () => {

@@ -234,7 +234,7 @@ export function registerSessionFileAccessHooks(): void {
   const hook: HookCallback = {
     type: 'callback',
     callback: handleSessionFileAccess,
-    timeout: 1, // Very short timeout - just logging
+    timeout: 1000,
     internal: true,
   }
 

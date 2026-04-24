@@ -1,5 +1,6 @@
 import { GrowthBook } from '@growthbook/growthbook'
 import { isEqual, memoize } from 'lodash-es'
+import { LRUCache } from 'lru-cache'
 import {
   getIsNonInteractiveSession,
   getSessionTrustAccepted,
@@ -74,11 +75,9 @@ type StoredExperimentData = {
   hashAttribute?: string
   hashValue?: string
 }
-const experimentDataByFeature = new Map<string, StoredExperimentData>()
+const experimentDataByFeature = new LRUCache<string, StoredExperimentData>({ max: 200 })
 
-// Cache for remote eval feature values - workaround for SDK not respecting remoteEval response
-// The SDK's setForcedFeatures also doesn't work reliably with remoteEval
-const remoteEvalFeatureValues = new Map<string, unknown>()
+const remoteEvalFeatureValues = new LRUCache<string, unknown>({ max: 200 })
 
 // Track features accessed before init that need exposure logging
 const pendingExposures = new Set<string>()

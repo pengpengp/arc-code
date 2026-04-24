@@ -1,7 +1,7 @@
 # Feature Flags Audit
 
 Audit date: 2026-03-31
-**Updated: 2026-04-12** — All 88 flags bundle cleanly. All 3 KAIROS subsystems fully implemented and wired. Project 100% complete.
+**Updated: 2026-04-24** — All 38 working feature flags now enabled by default in all builds. Agent SDK fully implemented (15/15 APIs). SDK type system unified and complete.
 
 This repository currently references 88 `feature('FLAG')` compile-time flags.
 I re-checked them by bundling the CLI once per flag on top of the current
@@ -10,6 +10,8 @@ external-build defines and externals. Result:
 - **All 88 flags bundle cleanly** with `bun run build:dev:full` — zero errors
 - ~~34 flags still fail to bundle~~ → **Fixed (2026-04-09)**: All 34 previously broken flags now bundle cleanly via stub file creation (.js → .ts migration and missing module reconstruction)
 - **3 KAIROS subsystems completed (2026-04-12)**: Assistant, Dream, and Proactive — all exports fixed and wired into main.tsx initialization
+- **All 38 experimental flags enabled by default (2026-04-24)**: `defaultFeatures` in `scripts/build.ts` changed from `[VOICE_MODE]` to `[...fullExperimentalFeatures]`
+- **Agent SDK fully implemented (2026-04-24)**: All 15 public APIs implemented with QueryEngine integration, 29 SDKMessage types, scoped env vars, session isolation
 
 Important: "bundle cleanly" does not always mean "runtime-safe". Some flags
 still depend on optional native modules, claude.ai OAuth, GrowthBook gates, or
@@ -18,24 +20,20 @@ externalized `@ant/*` packages.
 ## Build Variants
 
 - `bun run build`
-  Builds the regular external binary at `./cli`.
+  Builds the production binary at `./cli`. **All 38 experimental flags enabled by default.**
 - `bun run compile`
-  Builds the regular external binary at `./dist/cli`.
+  Builds the production binary at `./dist/cli`. **All 38 experimental flags enabled by default.**
 - `bun run build:dev`
-  Builds `./cli-dev` with a dev-stamped version and experimental GrowthBook key.
+  Builds `./cli-dev` with a dev-stamped version and experimental GrowthBook key. **All 38 experimental flags enabled.**
 - `bun run build:dev:full`
   Builds `./cli-dev` with the entire current "Working Experimental Features"
-  bundle from this document, minus `CHICAGO_MCP`. That flag still compiles,
-  but the external binary does not boot cleanly with it because startup
-  reaches the missing `@ant/computer-use-mcp` runtime package.
+  bundle from this document. Equivalent to `build:dev` since all flags are now default.
 
 ## Default Build Flags
 
-- `VOICE_MODE`
-  This is now included in the default build pipeline, not just the dev build.
-  It enables `/voice`, push-to-talk UI, voice notices, and dictation plumbing.
-  Runtime still depends on claude.ai OAuth plus either the native audio module
-  or a fallback recorder such as SoX.
+Since v2.1.87+, all 38 working experimental feature flags are enabled by default
+in every build variant. This was changed from the previous default of `VOICE_MODE` only.
+See `scripts/build.ts` → `defaultFeatures = [...fullExperimentalFeatures]`.
 
 ## Working Experimental Features
 

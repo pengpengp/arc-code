@@ -431,7 +431,8 @@ function TranscriptSearchBar({
         setIndexStatus({
           ms
         });
-        setTimeout(() => alive && setIndexStatus(null), 2000);
+        const timer = setTimeout(() => alive && setIndexStatus(null), 2000);
+        return () => { alive = false; clearTimeout(timer); };
       }
     });
     return () => {

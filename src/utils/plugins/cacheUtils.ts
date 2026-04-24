@@ -93,23 +93,26 @@ export async function cleanupOrphanedPluginVersionsInBackground(): Promise<void>
     )
 
     // Pass 2: Process orphaned versions
-    for (const marketplace of await readSubdirs(cachePath)) {
+    const marketplaces = await readSubdirs(cachePath)
+    await Promise.all(marketplaces.map(async marketplace => {
       const marketplacePath = join(cachePath, marketplace)
 
-      for (const plugin of await readSubdirs(marketplacePath)) {
+      const plugins = await readSubdirs(marketplacePath)
+      await Promise.all(plugins.map(async plugin => {
         const pluginPath = join(marketplacePath, plugin)
 
-        for (const version of await readSubdirs(pluginPath)) {
+        const versions = await readSubdirs(pluginPath)
+        await Promise.all(versions.map(async version => {
           const versionPath = join(pluginPath, version)
-          if (installedVersions.has(versionPath)) continue
+          if (installedVersions.has(versionPath)) return
           await processOrphanedPluginVersion(versionPath, now)
-        }
+        }))
 
         await removeIfEmpty(pluginPath)
-      }
+      }))
 
       await removeIfEmpty(marketplacePath)
-    }
+    }))
   } catch (error) {
     logForDebugging(`Plugin cache cleanup failed: ${error}`)
   }

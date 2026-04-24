@@ -1,5 +1,101 @@
 # Codex API Support: Feature Parity & UI Overhaul
 
+---
+
+# v2.1.87 Quality & SDK Completeness Pass (2026-04-24)
+
+## Summary
+Comprehensive quality improvement pass covering stability fixes, Agent SDK implementation, feature flag activation, type system unification, and performance optimizations. All 15 Agent SDK public APIs are now fully implemented. All 38 experimental feature flags are enabled by default in every build variant.
+
+## Key Changes
+
+### 1. Agent SDK — Full Implementation (0 → 15 APIs)
+
+All 15 public SDK APIs are now implemented with QueryEngine deep integration:
+
+| API | Status |
+|---|---|
+| `query({ prompt, options })` | ✅ Streaming AsyncIterable with abort/sessionId |
+| `unstable_v2_createSession(options)` | ✅ Multi-turn session with send/stream/close |
+| `unstable_v2_resumeSession(sessionId, options)` | ✅ Resume from saved conversation |
+| `unstable_v2_prompt(message, options)` | ✅ One-shot prompt returning SDKResultMessage |
+| `tool(name, desc, schema, handler)` | ✅ MCP tool definition factory |
+| `createSdkMcpServer(options)` | ✅ MCP server with stdio transport |
+| `listSessions(options?)` | ✅ List saved sessions |
+| `getSessionInfo(sessionId, options?)` | ✅ Get session metadata |
+| `getSessionMessages(sessionId, options?)` | ✅ Get session messages with pagination |
+| `renameSession(sessionId, title, options?)` | ✅ Rename a session |
+| `tagSession(sessionId, tag, options?)` | ✅ Tag a session |
+| `forkSession(sessionId, options?)` | ✅ Fork with UUID remapping |
+| `watchScheduledTasks(opts)` | ✅ Cron scheduler with event stream |
+| `buildMissedTaskNotification(tasks)` | ✅ Missed task notification builder |
+| `connectRemoteControl(opts)` | ✅ Bridge-based remote control via WebSocket/SSE |
+
+**SDKSession methods**: `send()`, `stream()`, `close()`, `interrupt()`, `setModel()`, `setPermissionMode()`, `getMessages()`, `addMcpServer()`, `removeMcpServer()`
+
+**SDKSessionOptions**: 22 typed fields including `env` (scoped environment variables), `hooks`, `agents`, `mcpConfigs`, `sdkMcpServers`, `permissionToolName`, `excludeDynamicSections`, `agentProgressSummaries`, `promptSuggestions`
+
+**SDKMessage types**: Expanded from 11 to 29 message types covering rate limits, hooks, tasks, auth, elicitation, etc.
+
+### 2. Feature Flags — All 38 Enabled by Default
+
+Changed `defaultFeatures` in `scripts/build.ts` from `[VOICE_MODE]` to `[...fullExperimentalFeatures]`. Every build variant (`build`, `build:dev`, `build:dev:full`, `compile`) now includes all 38 experimental feature flags.
+
+### 3. Stability & Bug Fixes
+
+- **Timeout fix**: `sessionFileAccessHooks.ts` timeout changed from 1ms to 1000ms
+- **Memory leak fixes**: Unbounded `Map` caches replaced with `LRUCache` (max 500/200 entries) in `memoize.ts` and `growthbook.ts`
+- **Silent error swallowing**: Added proper error logging in `main.tsx`, `replBridge.ts`, `gracefulShutdown.ts`, `LSPServerInstance.ts`, `mcp/client.ts`
+- **Resource limits**: `WebBrowserTool` MAX_SESSIONS=10, `SubscribePRTool` MAX_SUBSCRIPTIONS=50
+- **String concatenation**: Repeated `+=` on strings replaced with array `.join()` in `render-to-screen.ts`, `ripgrep.ts`, `createSSHSession.ts`, `dream.ts`
+- **Buffer concatenation**: `Buffer.concat` used instead of string concatenation in `ripgrep.ts`
+- **Promise parallelization**: Sequential `await` calls parallelized with `Promise.all` in `cacheUtils.ts`
+- **Recursion guard**: `MAX_RECURSION_DEPTH=64` added to `squash-text-nodes.ts`
+- **setTimeout cleanup**: Timer cleanup added in `REPL.tsx`
+- **setImmediate safety**: try-catch around `setImmediate` in `SendMessageTool.ts`
+- **Regex fix**: Unsafe regex in `torch.ts`
+- **Process exit**: `process.exit(0)` added in `main.tsx` catch block
+
+### 4. Type System Unification
+
+- **3 missing type files created**: `controlTypes.ts`, `settingsTypes.generated.ts`, `sdkUtilityTypes.ts`
+- **HookEvent unified**: Re-exported from `coreTypes.generated.ts` (was 3 separate definitions)
+- **PermissionMode unified**: Re-exported from `coreTypes.generated.ts` with `RuntimePermissionMode` extension
+- **toolTypes.ts populated**: Exports `ToolInputJSONSchema`, `ValidationResult`, `AnyObject`
+- **tsconfig.json**: Added `noImplicitReturns: true`
+
+### 5. SDK Session Safety
+
+- **No global state pollution**: Removed `switchSession()`/`setCwdState()`/`setOriginalCwd()` calls from `createSDKSessionContext` — concurrent sessions no longer conflict
+- **Scoped environment variables**: `options.env` applies to `process.env` with automatic cleanup on session close
+- **Session ID isolation**: `promptImpl` uses `Query.sessionId` instead of global `getSessionId()`
+- **MCP server filtering**: `sdkMcpServers` option controls which SDK-type MCP servers are connected
+- **AsyncLocalStorage-ready**: Session context stores all config locally, no global singleton dependencies
+
+### 6. New Files
+
+- `src/entrypoints/sdk/agentSdkImpl.ts` — All 15 SDK API implementations
+- `src/entrypoints/sdk/sdkSessionContext.ts` — Session management (Query/SDKSession/SessionContext)
+- `src/entrypoints/sdk/controlTypes.ts` — Control protocol types (21 subtypes)
+- `src/entrypoints/sdk/settingsTypes.generated.ts` — Settings schema types
+- `src/entrypoints/sdk/sdkUtilityTypes.ts` — Utility types (token usage)
+- `src/entrypoints/sdk/__tests__/integration.test.ts` — 8 integration tests
+- `src/entrypoints/sdk/__tests__/sdkSessionContext.test.ts` — 22 unit tests
+- `src/utils/zodErrors.ts` — Shared `formatZodIssues()` utility
+
+### 7. Modified Files
+
+- `scripts/build.ts` — `defaultFeatures = [...fullExperimentalFeatures]`
+- `src/entrypoints/agentSdkTypes.ts` — Re-exports all SDK functions and types
+- `src/entrypoints/sdk/coreTypes.generated.ts` — SDKMessage expanded to 29 types
+- `src/entrypoints/sdk/runtimeTypes.ts` — Full SDKSessionOptions (22 fields), Query with sessionId, SDKSession with addMcpServer/removeMcpServer
+- `src/entrypoints/sdk/toolTypes.ts` — Populated with tool type exports
+- `src/utils/sessionFileAccessHooks.ts`, `src/tools/WebBrowserTool/WebBrowserTool.ts`, `src/tools/SubscribePRTool/SubscribePRTool.ts`, `src/utils/memoize.ts`, `src/services/analytics/growthbook.ts`, `src/main.tsx`, `src/bridge/replBridge.ts`, `src/utils/gracefulShutdown.ts`, `src/services/lsp/LSPServerInstance.ts`, `src/services/mcp/client.ts`, `src/utils/messages.ts`, `src/screens/REPL.tsx`, `src/utils/plugins/cacheUtils.ts`, `src/ink/render-to-screen.ts`, `src/utils/ripgrep.ts`, `src/ssh/createSSHSession.ts`, `src/dream.ts`, `src/ink/squash-text-nodes.ts`, `src/tools/SendMessageTool/SendMessageTool.ts`, `src/commands/torch.ts`, `tsconfig.json`
+
+---
+
+# Codex API Support: Feature Parity & UI Overhaul
+
 ## Summary
 This pull request introduces full feature parity and explicit UI support for the OpenAI Codex backend (`chatgpt.com/backend-api/codex/responses`). The codebase is now entirely backend-agnostic and smoothly transitions between Anthropic Claude and OpenAI Codex schemas based on current authentication, without losing features like reasoning animations, token billing, or multi-modal visual inputs.
 

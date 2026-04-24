@@ -143,14 +143,17 @@ function ripGrepRaw(
 
     let stdout = ''
     let stderr = ''
+    let stdoutChunks: Buffer[] = []
+    let stderrChunks: Buffer[] = []
     let stdoutTruncated = false
     let stderrTruncated = false
 
     child.stdout?.on('data', (data: Buffer) => {
       if (!stdoutTruncated) {
-        stdout += data.toString()
-        if (stdout.length > MAX_BUFFER_SIZE) {
-          stdout = stdout.slice(0, MAX_BUFFER_SIZE)
+        stdoutChunks.push(data)
+        const totalLen = stdoutChunks.reduce((s, c) => s + c.length, 0)
+        if (totalLen > MAX_BUFFER_SIZE) {
+          stdout = Buffer.concat(stdoutChunks).toString().slice(0, MAX_BUFFER_SIZE)
           stdoutTruncated = true
         }
       }
@@ -158,8 +161,9 @@ function ripGrepRaw(
 
     child.stderr?.on('data', (data: Buffer) => {
       if (!stderrTruncated) {
-        stderr += data.toString()
-        if (stderr.length > MAX_BUFFER_SIZE) {
+        stderrChunks.push(data)
+        const totalLen = stderrChunks.reduce((s, c) => s + c.length, 0)
+        if (totalLen > MAX_BUFFER_SIZE) {
           stderr = stderr.slice(0, MAX_BUFFER_SIZE)
           stderrTruncated = true
         }
@@ -189,6 +193,8 @@ function ripGrepRaw(
       settled = true
       clearTimeout(timeoutId)
       clearTimeout(killTimeoutId)
+      if (!stdoutTruncated && stdoutChunks.length > 0) stdout = Buffer.concat(stdoutChunks).toString()
+      if (!stderrTruncated && stderrChunks.length > 0) stderr = Buffer.concat(stderrChunks).toString()
       if (code === 0 || code === 1) {
         // 0 = matches found, 1 = no matches (both are success)
         callback(null, stdout, stderr)

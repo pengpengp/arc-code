@@ -1943,8 +1943,8 @@ async function run(): Promise<CommanderCommand> {
     const agentDefsPromise = worktreeEnabled ? null : getAgentDefinitionsWithOverrides(preSetupCwd);
     // Suppress transient unhandledRejection if these reject during the
     // ~28ms setupPromise await before Promise.all joins them below.
-    commandsPromise?.catch(() => {});
-    agentDefsPromise?.catch(() => {});
+    commandsPromise?.catch(e => logForDebugging(`[STARTUP] commands prefetch rejected: ${e}`));
+    agentDefsPromise?.catch(e => logForDebugging(`[STARTUP] agent defs prefetch rejected: ${e}`));
     await setupPromise;
     logForDebugging(`[STARTUP] setup() completed in ${Date.now() - setupStart}ms`);
     profileCheckpoint('action_after_setup');
@@ -2449,7 +2449,7 @@ async function run(): Promise<CommanderCommand> {
     const hookMessages: Awaited<NonNullable<typeof hooksPromise>> = [];
     // Suppress transient unhandledRejection — the prefetch warms the
     // memoized connectToServer cache but nobody awaits it in interactive.
-    mcpPromise.catch(() => {});
+    mcpPromise.catch(e => logForDebugging(`[STARTUP] MCP prefetch rejected: ${e}`));
     const mcpClients: Awaited<typeof mcpPromise>['clients'] = [];
     const mcpTools: Awaited<typeof mcpPromise>['tools'] = [];
     const mcpCommands: Awaited<typeof mcpPromise>['commands'] = [];
@@ -2608,7 +2608,7 @@ async function run(): Promise<CommanderCommand> {
       // Suppress transient unhandledRejection if this rejects before
       // loadInitialMessages awaits it. Downstream await still observes the
       // rejection — this just prevents the spurious global handler fire.
-      sessionStartHooksPromise?.catch(() => {});
+      sessionStartHooksPromise?.catch(e => logForDebugging(`[STARTUP] session start hooks rejected: ${e}`));
       profileCheckpoint('before_validateForceLoginOrg');
       // Validate org restriction for non-interactive sessions
       const orgValidation = await validateForceLoginOrg();
@@ -2755,7 +2755,7 @@ async function run(): Promise<CommanderCommand> {
             for (const c of headlessStore.getState().mcp.clients) {
               if (!suppressed.has(c.name) || c.type !== 'connected') continue;
               c.client.onclose = undefined;
-              void clearServerCache(c.name, c.config).catch(() => {});
+              void clearServerCache(c.name, c.config).catch(e => logForDebugging(`[MCP] clearServerCache rejected for ${c.name}: ${e}`));
             }
             headlessStore.setState(prev => {
               let {
@@ -4306,7 +4306,7 @@ async function run(): Promise<CommanderCommand> {
           autoModeCritiqueHandler
         } = await import('./cli/handlers/autoMode.js');
         await autoModeCritiqueHandler(options);
-        process.exit();
+        process.exit(0);
       });
     }
   }

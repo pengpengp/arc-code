@@ -37,14 +37,21 @@ type LRUMemoizedFunction<Args extends unknown[], Result> = {
  * @param cacheLifetimeMs The lifetime of cached values in milliseconds
  * @returns A memoized version of the function
  */
+const DEFAULT_MAX_CACHE_SIZE = 500
+
 export function memoizeWithTTL<Args extends unknown[], Result>(
   f: (...args: Args) => Result,
-  cacheLifetimeMs: number = 5 * 60 * 1000, // Default 5 minutes
+  cacheLifetimeMs: number = 5 * 60 * 1000,
+  maxCacheSize: number = DEFAULT_MAX_CACHE_SIZE,
 ): MemoizedFunction<Args, Result> {
-  const cache = new Map<string, CacheEntry<Result>>()
+  const cache = new LRUCache<string, CacheEntry<Result>>({
+    max: maxCacheSize,
+  })
 
   const memoized = (...args: Args): Result => {
-    const key = jsonStringify(args)
+    const key = args.length === 1 && (typeof args[0] === 'string' || typeof args[0] === 'number')
+      ? String(args[0])
+      : jsonStringify(args)
     const cached = cache.get(key)
     const now = Date.now()
 
@@ -119,9 +126,12 @@ export function memoizeWithTTL<Args extends unknown[], Result>(
  */
 export function memoizeWithTTLAsync<Args extends unknown[], Result>(
   f: (...args: Args) => Promise<Result>,
-  cacheLifetimeMs: number = 5 * 60 * 1000, // Default 5 minutes
+  cacheLifetimeMs: number = 5 * 60 * 1000,
+  maxCacheSize: number = DEFAULT_MAX_CACHE_SIZE,
 ): ((...args: Args) => Promise<Result>) & { cache: { clear: () => void } } {
-  const cache = new Map<string, CacheEntry<Result>>()
+  const cache = new LRUCache<string, CacheEntry<Result>>({
+    max: maxCacheSize,
+  })
   // In-flight cold-miss dedup. The old memoizeWithTTL (sync) accidentally
   // provided this: it stored the Promise synchronously before the first
   // await, so concurrent callers shared one f() invocation. This async
@@ -132,7 +142,9 @@ export function memoizeWithTTLAsync<Args extends unknown[], Result>(
   const inFlight = new Map<string, Promise<Result>>()
 
   const memoized = async (...args: Args): Promise<Result> => {
-    const key = jsonStringify(args)
+    const key = args.length === 1 && (typeof args[0] === 'string' || typeof args[0] === 'number')
+      ? String(args[0])
+      : jsonStringify(args)
     const cached = cache.get(key)
     const now = Date.now()
 

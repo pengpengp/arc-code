@@ -250,9 +250,8 @@ export function createLSPServerInstance(
       logForDebugging(`LSP server instance started: ${name}`)
     } catch (error) {
       // Clean up the spawned child process on timeout/error
-      client.stop().catch(() => {})
-      // Prevent unhandled rejection from abandoned initialize promise
-      initPromise?.catch(() => {})
+      client.stop().catch(e => logForDebugging(`LSP client stop failed: ${e}`))
+      initPromise?.catch(e => logForDebugging(`LSP init promise rejected: ${e}`))
       state = 'error'
       lastError = error as Error
       logError(error)

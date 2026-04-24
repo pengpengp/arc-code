@@ -73,6 +73,7 @@ import { getFsImplementation } from '../fsOperations.js'
 import { gitExe } from '../git.js'
 import { lazySchema } from '../lazySchema.js'
 import { logError } from '../log.js'
+import { formatZodIssues } from '../zodErrors.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import {
   clearPluginSettingsBase,
@@ -990,9 +991,7 @@ export async function cachePlugin(
         manifest = result.data
       } else {
         // Manifest exists but is invalid - throw error
-        const errors = result.error.issues
-          .map(err => `${err.path.join('.')}: ${err.message}`)
-          .join(', ')
+        const errors = formatZodIssues(result.error)
 
         logForDebugging(`Invalid manifest at ${manifestPath}: ${errors}`, {
           level: 'error',
@@ -1036,9 +1035,7 @@ export async function cachePlugin(
         manifest = result.data
       } else {
         // Manifest exists but is invalid - throw error
-        const errors = result.error.issues
-          .map(err => `${err.path.join('.')}: ${err.message}`)
-          .join(', ')
+        const errors = formatZodIssues(result.error)
 
         logForDebugging(
           `Invalid legacy manifest at ${legacyManifestPath}: ${errors}`,
@@ -1173,13 +1170,7 @@ export async function loadPluginManifest(
     }
 
     // Schema validation failed but JSON was valid
-    const errors = result.error.issues
-      .map(err =>
-        err.path.length > 0
-          ? `${err.path.join('.')}: ${err.message}`
-          : err.message,
-      )
-      .join(', ')
+    const errors = formatZodIssues(result.error)
 
     logForDebugging(
       `Plugin ${pluginName} has an invalid manifest file at ${manifestPath}. Validation errors: ${errors}`,

@@ -1056,9 +1056,9 @@ export const connectToServer = memoize(
             `Connection timeout triggered after ${elapsed}ms (limit: ${getConnectionTimeoutMs()}ms)`,
           )
           if (inProcessServer) {
-            inProcessServer.close().catch(() => {})
+            inProcessServer.close().catch(e => logMCPDebug(name, `inProcessServer close failed: ${e}`))
           }
-          transport.close().catch(() => {})
+          transport.close().catch(e => logMCPDebug(name, `transport close failed: ${e}`))
           reject(
             new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
               `MCP server "${name}" connection timed out after ${getConnectionTimeoutMs()}ms`,
@@ -1147,9 +1147,9 @@ export const connectToServer = memoize(
           })
         }
         if (inProcessServer) {
-          inProcessServer.close().catch(() => {})
+          inProcessServer.close().catch(e => logMCPDebug(name, `inProcessServer close failed: ${e}`))
         }
-        transport.close().catch(() => {})
+        transport.close().catch(e => logMCPDebug(name, `transport close failed: ${e}`))
         if (stderrOutput) {
           logMCPError(name, `Server stderr: ${stderrOutput}`)
         }
@@ -1629,7 +1629,7 @@ export const connectToServer = memoize(
       logMCPError(name, `Connection failed: ${errorMessage(error)}`)
 
       if (inProcessServer) {
-        inProcessServer.close().catch(() => {})
+        inProcessServer.close().catch(e => logMCPDebug(name, `inProcessServer close failed: ${e}`))
       }
       return {
         name,

@@ -8,11 +8,13 @@
 - OAuth login: `./cli /login`
 
 ## Build Variants (Critical for Feature Flags)
-- Production-like: `bun run build` → `./cli` (**VOICE_MODE only**)
-- Dev build: `bun run build:dev` → `./cli-dev` (**VOICE_MODE only**)
-- **Full experimental**: `bun run build:dev:full` → `./cli-dev` (all 54 working flags)
+- Production-like: `bun run build` → `./cli` (**All 38 experimental flags**)
+- Dev build: `bun run build:dev` → `./cli-dev` (**All 38 experimental flags**)
+- **Full experimental**: `bun run build:dev:full` → `./cli-dev` (same as above, alias)
 - Custom flags: `bun run ./scripts/build.ts --feature=ULTRAPLAN --feature=ULTRATHINK`
-- **Alternative output**: `bun run compile` → `./dist/cli` (VOICE_MODE only)
+- **Alternative output**: `bun run compile` → `./dist/cli` (**All 38 experimental flags**)
+
+> Since v2.1.87+, all builds enable all 38 experimental feature flags by default.
 
 ## Special CLI Entry Points (Easy to Miss)
 These flags are handled early in `src/entrypoints/cli.tsx` before loading full CLI:
@@ -41,6 +43,7 @@ These flags are handled early in `src/entrypoints/cli.tsx` before loading full C
 
 ## Project Structure (Key Subsystems)
 - Entry point: `src/entrypoints/cli.tsx`
+- Agent SDK: `src/entrypoints/sdk/` (15 public APIs, 29 message types)
 - Main UI: `src/screens/REPL.tsx` (Ink/React)
 - Command registry: `src/commands.ts` → impl in `src/commands/`
 - Tool registry: `src/tools.ts` → impl in `src/tools/`

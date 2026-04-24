@@ -125,7 +125,7 @@ function printLoadedModules() {
   // Show top modules by path prefix
   const prefixes: Record<string, number> = {}
   for (const m of modules) {
-    const prefix = m.split(/[/\]/).slice(0, -1).join('/')
+    const prefix = m.split(/[/\\]/).slice(0, -1).join('/')
     const short = prefix.length > 60 ? '...' + prefix.slice(-57) : prefix
     prefixes[short] = (prefixes[short] || 0) + 1
   }

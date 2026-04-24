@@ -15,12 +15,16 @@ export type StyledSegment = {
  * Squash text nodes into styled segments, propagating styles down through the tree.
  * This allows structured styling without relying on ANSI string transforms.
  */
+const MAX_RECURSION_DEPTH = 64
+
 export function squashTextNodesToSegments(
   node: DOMElement,
   inheritedStyles: TextStyles = {},
   inheritedHyperlink?: string,
   out: StyledSegment[] = [],
+  depth: number = 0,
 ): StyledSegment[] {
+  if (depth > MAX_RECURSION_DEPTH) return out
   const mergedStyles = node.textStyles
     ? { ...inheritedStyles, ...node.textStyles }
     : inheritedStyles
@@ -47,6 +51,7 @@ export function squashTextNodesToSegments(
         mergedStyles,
         inheritedHyperlink,
         out,
+        depth + 1,
       )
     } else if (childNode.nodeName === 'ink-link') {
       const href = childNode.attributes['href'] as string | undefined
@@ -55,6 +60,7 @@ export function squashTextNodesToSegments(
         mergedStyles,
         href || inheritedHyperlink,
         out,
+        depth + 1,
       )
     }
   }
@@ -66,7 +72,8 @@ export function squashTextNodesToSegments(
  * Squash text nodes into a plain string (without styles).
  * Used for text measurement in layout calculations.
  */
-function squashTextNodes(node: DOMElement): string {
+function squashTextNodes(node: DOMElement, depth: number = 0): string {
+  if (depth > MAX_RECURSION_DEPTH) return ''
   let text = ''
 
   for (const childNode of node.childNodes) {
@@ -80,9 +87,9 @@ function squashTextNodes(node: DOMElement): string {
       childNode.nodeName === 'ink-text' ||
       childNode.nodeName === 'ink-virtual-text'
     ) {
-      text += squashTextNodes(childNode)
+      text += squashTextNodes(childNode, depth + 1)
     } else if (childNode.nodeName === 'ink-link') {
-      text += squashTextNodes(childNode)
+      text += squashTextNodes(childNode, depth + 1)
     }
   }
 

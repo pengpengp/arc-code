@@ -13,6 +13,7 @@ const inputSchema = lazySchema(() =>
 )
 
 // Active subscriptions stored in-memory (resets on restart)
+const MAX_SUBSCRIPTIONS = 50
 const activeSubscriptions = new Map<string, { repo: string; pr: number; events: string[]; subscribedAt: string }>()
 
 async function isGitHubCliAvailable(): Promise<boolean> {
@@ -105,6 +106,10 @@ export const SubscribePRTool = buildTool({
       const webhook = await createWebhook(repo, subEvents)
 
       const subId = `sub_${owner}_${_repo}_${pr_number}_${Date.now()}`
+      if (activeSubscriptions.size >= MAX_SUBSCRIPTIONS) {
+        const oldestKey = activeSubscriptions.keys().next().value
+        if (oldestKey !== undefined) activeSubscriptions.delete(oldestKey)
+      }
       activeSubscriptions.set(subId, {
         repo,
         pr: pr_number,

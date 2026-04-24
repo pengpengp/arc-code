@@ -2648,6 +2648,28 @@ export function mergeUserContentBlocks(
 
 // Sometimes the API returns empty messages (eg. "\n\n"). We need to filter these out,
 // otherwise they will give an API error when we send them to the API next time we call query().
+function recursivelyParseStringifiedFields(obj: unknown, depth: number = 0): unknown {
+  if (depth > 5) return obj
+  if (typeof obj === 'string') {
+    const parsed = safeParseJSON(obj, false)
+    if (parsed !== null && typeof parsed === 'object') {
+      return recursivelyParseStringifiedFields(parsed, depth + 1)
+    }
+    return obj
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => recursivelyParseStringifiedFields(item, depth + 1))
+  }
+  if (obj !== null && typeof obj === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      result[key] = recursivelyParseStringifiedFields(value, depth + 1)
+    }
+    return result
+  }
+  return obj
+}
+
 export function normalizeContentFromAPI(
   contentBlocks: BetaMessage['content'],
   tools: Tools,
@@ -2671,15 +2693,10 @@ export function normalizeContentFromAPI(
         // The API has strange behaviour, where it returns nested stringified JSONs, and so
         // we need to recursively parse these. If the top-level value returned from the API is
         // an empty string, this should become an empty object (nested values should be empty string).
-        // TODO: This needs patching as recursive fields can still be stringified
         let normalizedInput: unknown
         if (typeof contentBlock.input === 'string') {
           const parsed = safeParseJSON(contentBlock.input)
           if (parsed === null && contentBlock.input.length > 0) {
-            // TET/FC-v3 diagnostic: the streamed tool input JSON failed to
-            // parse. We fall back to {} which means downstream validation
-            // sees empty input. The raw prefix goes to debug log only — no
-            // PII-tagged proto column exists for it yet.
             logEvent('tengu_tool_input_json_parse_fail', {
               toolName: sanitizeToolNameForAnalytics(contentBlock.name),
               inputLen: contentBlock.input.length,
@@ -2691,9 +2708,9 @@ export function normalizeContentFromAPI(
               )
             }
           }
-          normalizedInput = parsed ?? {}
+          normalizedInput = recursivelyParseStringifiedFields(parsed ?? {})
         } else {
-          normalizedInput = contentBlock.input
+          normalizedInput = recursivelyParseStringifiedFields(contentBlock.input)
         }
 
         // Then apply tool-specific corrections
